@@ -256,7 +256,7 @@
   </div>
 
   <script>
-    const socket = typeof io !== 'undefined' ? io() : null;
+   const socket = typeof io !== 'undefined' ? io('https://ticketmaster-production.up.railway.app') : null;
     let currentUser = null;
     let currentStaff = null;
     let misSillasSeleccionadas = [];
