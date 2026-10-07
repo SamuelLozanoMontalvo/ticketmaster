@@ -9,7 +9,7 @@
 
   <!-- SDKs Externos -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
@@ -623,6 +623,8 @@
     }
 
     window.onload = inicializarMapa;
+
+    const socket = typeof io !== 'undefined' ? io('https://ticketmaster-production.up.railway.app') : null;
   </script>
 </body>
 </html>
