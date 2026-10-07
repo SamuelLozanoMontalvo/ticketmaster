@@ -1,28 +1,34 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+
+// Habilitar CORS sin restricciones para Netlify
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
 
 app.use(express.static(__dirname));
 
-// Estado de sillas en memoria
+// Estado en memoria
 const seatsState = {};
 const activeTimers = {};
-const LOCK_TIME_MS = 5 * 60 * 1000; // 5 minutos
+const LOCK_TIME_MS = 5 * 60 * 1000;
 
-// Base de datos simulada en memoria
 const salesHistory = [];
 const staffUsers = [];
 const ADMIN_USER = { username: 'admin', password: 'admin123password' };
 
 io.on('connection', (socket) => {
+  // Enviar estado actual del mapa al conectarse
   socket.emit('MAP_STATE', seatsState);
 
-  // --- LÓGICA DE SILLAS Y BLOQUEOS ---
+  // --- GESTIÓN DE SILLAS Y BLOQUEOS ---
   socket.on('LOCK_SEATS', ({ seatIds }) => {
     const expiresAt = Date.now() + LOCK_TIME_MS;
     const allAvailable = seatIds.every(id => !seatsState[id] || seatsState[id].status === 'available');
@@ -58,7 +64,7 @@ io.on('connection', (socket) => {
     if (unlocked.length > 0) io.emit('SEATS_RELEASED', { seatIds: unlocked });
   });
 
-  // --- CONFIRMACIÓN DE VENTA ---
+  // --- CONFIRMACIÓN Y REGISTRO DE COMPRA ---
   socket.on('CONFIRM_PURCHASE', (datosCompra) => {
     datosCompra.seatIds.forEach(seatId => {
       if (seatsState[seatId]) seatsState[seatId].status = 'sold';
@@ -104,7 +110,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // --- CREAR STAFF (ADMIN) ---
+  // --- GESTIÓN DE STAFF ---
   socket.on('CREATE_STAFF', (staffData) => {
     const newStaff = {
       id: 'STF-' + Math.floor(1000 + Math.random() * 9000),
@@ -119,7 +125,7 @@ io.on('connection', (socket) => {
     io.emit('STAFF_LIST_UPDATED', staffUsers);
   });
 
-  // --- VALIDACIÓN DE QR / CÓDIGO (STAFF) ---
+  // --- VALIDACIÓN DE ENTRADAS (STAFF) ---
   socket.on('VALIDATE_TICKET', ({ codigo, staffUsername }) => {
     const venta = salesHistory.find(v => v.codigoCompra === codigo || v.idPedido === codigo);
 
@@ -131,7 +137,7 @@ io.on('connection', (socket) => {
     if (venta.usado) {
       socket.emit('VALIDATION_RESULT', {
         status: 'USED',
-        message: `⚠️ ENTRADA YA FUE UTILIZADA\nEscaneado por: ${venta.escaneadoPor} a las ${venta.fechaEscaneo}`
+        message: `⚠️ ENTRADA YA FUE UTILIZADA\nEscaneado previamente por: ${venta.escaneadoPor} a las ${venta.fechaEscaneo}`
       });
       return;
     }
@@ -162,4 +168,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor iniciado en http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Servidor activo en el puerto ${PORT}`));
