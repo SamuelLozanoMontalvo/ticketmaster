@@ -7,7 +7,7 @@
   
   <link rel="stylesheet" href="style.css">
 
-  <!-- SDKs Externos por CDN (No usar rutas locales de socket.io) -->
+  <!-- Carga de Librerías Vía CDN (Evita error 404 en Netlify) -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
@@ -32,7 +32,7 @@
     </div>
   </header>
 
-  <!-- VISTA CLIENTE: COMPRA Y MAPA -->
+  <!-- VISTA CLIENTE -->
   <main id="view-client" class="main-layout">
     <section class="control-panel">
       <h2>Tu Selección</h2>
@@ -75,7 +75,7 @@
     </section>
   </main>
 
-  <!-- VISTA ADMINISTRADOR -->
+  <!-- VISTA ADMIN -->
   <div id="view-admin" class="admin-dashboard">
     <h2>Panel de Control Administrador</h2>
 
@@ -256,7 +256,9 @@
   </div>
 
   <script>
-   const socket = typeof io !== 'undefined' ? io('https://ticketmaster-production.up.railway.app') : null;
+    // Conexión explicita al backend de Railway
+    const socket = typeof io !== 'undefined' ? io('https://ticketmaster-production.up.railway.app') : null;
+    
     let currentUser = null;
     let currentStaff = null;
     let misSillasSeleccionadas = [];
@@ -321,6 +323,7 @@
 
     function loginAdmin(e) {
       e.preventDefault();
+      if (!socket) return alert("Error de conexión con el servidor.");
       socket.emit('ADMIN_LOGIN', {
         username: document.getElementById('admin-user').value,
         password: document.getElementById('admin-pass').value
@@ -329,6 +332,7 @@
 
     function loginStaff(e) {
       e.preventDefault();
+      if (!socket) return alert("Error de conexión con el servidor.");
       socket.emit('STAFF_LOGIN', {
         username: document.getElementById('staff-user').value,
         password: document.getElementById('staff-pass').value
@@ -405,6 +409,7 @@
 
     function crearStaff(e) {
       e.preventDefault();
+      if (!socket) return;
       socket.emit('CREATE_STAFF', {
         nombre: document.getElementById('stf-nombre').value,
         apellido: document.getElementById('stf-apellido').value,
@@ -438,6 +443,7 @@
     }
 
     function validarCodigo(codigo) {
+      if (!socket) return;
       socket.emit('VALIDATE_TICKET', { codigo, staffUsername: currentStaff ? currentStaff.username : 'Staff' });
     }
 
@@ -454,6 +460,7 @@
       Object.keys(CONFIG).forEach(key => {
         const conf = CONFIG[key];
         const container = document.getElementById(`zone-${key.toLowerCase()}`);
+        if (!container) return;
         for (let charCode = conf.start.charCodeAt(0); charCode <= conf.end.charCodeAt(0); charCode++) {
           const letra = String.fromCharCode(charCode);
           for (let i = 1; i <= 5; i++) {
@@ -491,6 +498,7 @@
 
     function toggleSilla(seatId) {
       if (!currentUser) return abrirModalAuth('login');
+      if (!socket) return;
       if (misSillasSeleccionadas.includes(seatId)) {
         socket.emit('UNLOCK_SEATS', { seatIds: [seatId] });
       } else {
@@ -501,6 +509,7 @@
 
     function comprarMesaCompleta(mesaId) {
       if (!currentUser) return abrirModalAuth('login');
+      if (!socket) return;
       const sillasMesa = Array.from({ length: 10 }, (_, i) => `${mesaId}-S${i + 1}`);
       socket.emit('LOCK_SEATS', { seatIds: sillasMesa });
     }
@@ -596,7 +605,7 @@
 
       QRCode.toCanvas(document.getElementById('qr-canvas'), JSON.stringify({ codigo: codigoCompra, pedido: idPedido }), { width: 130 });
 
-      socket.emit('CONFIRM_PURCHASE', datosCompra);
+      if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
       document.getElementById('ticket-modal').style.display = 'flex';
     }
 
@@ -623,8 +632,6 @@
     }
 
     window.onload = inicializarMapa;
-
-    const socket = typeof io !== 'undefined' ? io('https://ticketmaster-production.up.railway.app') : null;
   </script>
 </body>
 </html>
