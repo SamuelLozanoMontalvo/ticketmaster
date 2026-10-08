@@ -7,11 +7,12 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 
+app.use(express.json());
+app.use(express.static(__dirname));
+
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
-
-app.use(express.static(__dirname));
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
@@ -27,17 +28,8 @@ function cargarDatos() {
       const rawData = fs.readFileSync(DATA_FILE, 'utf8');
       const parsed = JSON.parse(rawData);
       seatsState = parsed.seatsState || {};
-      
-      const historialCargado = parsed.salesHistory || [];
-      salesHistory = historialCargado.filter(v => 
-        v.codigoCompra && 
-        v.codigoCompra !== 'undefined' && 
-        v.puestos && 
-        v.puestos.length > 0
-      );
-      
+      salesHistory = parsed.salesHistory || [];
       staffUsers = parsed.staffUsers || [];
-      console.log('Datos cargados correctamente desde data.json');
     }
   } catch (err) {
     console.error('Error leyendo data.json:', err);
@@ -59,6 +51,43 @@ const ADMIN_USERS = [
   { username: 'admindos', password: 'emhotelsadmin31' }
 ];
 
+// MATRIZ DE PRECIOS DEL SERVIDOR (Preventa, Etapa 2, Full)
+const TABLA_PRECIOS_SERVER = {
+  PREVENTA: {
+    SAHARA: { ADULTO: 1050000, NINO: 420000 },
+    OASIS:  { ADULTO: 950000,  NINO: 420000 },
+    NOMAD:  { ADULTO: 850000,  NINO: 420000 }
+  },
+  ETAPA2: {
+    SAHARA: { ADULTO: 1100000, NINO: 490000 },
+    OASIS:  { ADULTO: 1000000, NINO: 490000 },
+    NOMAD:  { ADULTO: 900000,  NINO: 490000 }
+  },
+  FULL: {
+    SAHARA: { ADULTO: 1200000, NINO: 550000 },
+    OASIS:  { ADULTO: 1100000, NINO: 550000 },
+    NOMAD:  { ADULTO: 1000000, NINO: 550000 }
+  }
+};
+
+function obtenerEtapaServidor() {
+  const hoy = new Date();
+  const mes = hoy.getMonth() + 1;
+  const dia = hoy.getDate();
+
+  if (mes < 10 || (mes === 10 && dia <= 15)) return 'PREVENTA';
+  if ((mes === 10 && dia >= 16) || mes === 11) return 'ETAPA2';
+  return 'FULL';
+}
+
+function obtenerZonaPuesto(seatId) {
+  const letra = seatId.charAt(0);
+  if (letra === 'A' || letra === 'B') return 'SAHARA';
+  if (['C', 'D', 'E', 'F', 'G', 'H'].includes(letra)) return 'OASIS';
+  return 'NOMAD';
+}
+
+// Lógica de Socket.io
 io.on('connection', (socket) => {
   socket.emit('MAP_STATE', seatsState);
 
@@ -67,7 +96,7 @@ io.on('connection', (socket) => {
     const allAvailable = seatIds.every(id => !seatsState[id] || seatsState[id].status === 'available');
 
     if (!allAvailable) {
-      socket.emit('LOCK_FAILED', { message: 'Una o más sillas seleccionadas ya no están disponibles.' });
+      socket.emit('LOCK_FAILED', { message: 'Puestos no disponibles.' });
       return;
     }
 
@@ -105,9 +134,16 @@ io.on('connection', (socket) => {
   socket.on('CONFIRM_PURCHASE', (datosCompra) => {
     if (!datosCompra || !datosCompra.seatIds || datosCompra.seatIds.length === 0) return;
 
+    // Calcular el total real en el servidor para evitar manipulaciones de precio
+    const etapa = obtenerEtapaServidor();
+    let totalVerificado = 0;
+
     datosCompra.seatIds.forEach(seatId => {
       if (activeTimers[seatId]) clearTimeout(activeTimers[seatId]);
       seatsState[seatId] = { status: 'sold' };
+
+      const zona = obtenerZonaPuesto(seatId);
+      totalVerificado += TABLA_PRECIOS_SERVER[etapa][zona].ADULTO;
     });
 
     const nuevaVenta = {
@@ -116,7 +152,7 @@ io.on('connection', (socket) => {
       cliente: datosCompra.cliente || 'Cliente General',
       numEntradas: datosCompra.seatIds.length,
       puestos: datosCompra.seatIds,
-      total: datosCompra.total || 0,
+      total: datosCompra.total || totalVerificado,
       fechaHora: datosCompra.fechaHora || new Date().toLocaleString('es-CO'),
       usado: false,
       escaneadoPor: null,
@@ -131,8 +167,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('GET_USER_TICKETS', ({ cliente }) => {
-    const userTickets = salesHistory.filter(v => v.cliente === cliente);
-    socket.emit('USER_TICKETS_RESPONSE', userTickets);
+    socket.emit('USER_TICKETS_RESPONSE', salesHistory.filter(v => v.cliente === cliente));
   });
 
   socket.on('ADMIN_LOGIN', ({ username, password }) => {
@@ -151,11 +186,8 @@ io.on('connection', (socket) => {
 
   socket.on('STAFF_LOGIN', ({ username, password }) => {
     const foundStaff = staffUsers.find(s => s.username === username && s.password === password);
-    if (foundStaff) {
-      socket.emit('STAFF_AUTH_SUCCESS', foundStaff);
-    } else {
-      socket.emit('STAFF_AUTH_FAILED', { message: 'Credenciales de Staff no encontradas.' });
-    }
+    if (foundStaff) socket.emit('STAFF_AUTH_SUCCESS', foundStaff);
+    else socket.emit('STAFF_AUTH_FAILED', { message: 'Credenciales de Staff no encontradas.' });
   });
 
   socket.on('DELETE_TICKET', ({ codigoCompra }) => {
@@ -183,7 +215,6 @@ io.on('connection', (socket) => {
       password: staffData.password,
       fechaCreacion: new Date().toLocaleDateString('es-CO')
     };
-
     staffUsers.push(newStaff);
     guardarDatos();
     io.emit('STAFF_LIST_UPDATED', staffUsers);
@@ -206,7 +237,7 @@ io.on('connection', (socket) => {
     if (venta.usado) {
       socket.emit('VALIDATION_RESULT', {
         status: 'USED',
-        message: `⚠️ ENTRADA YA FUE UTILIZADA\nEscaneado previamente por: ${venta.escaneadoPor} a las ${venta.fechaEscaneo}`
+        message: `⚠️ ENTRADA YA FUE UTILIZADA\nEscaneado por: ${venta.escaneadoPor} a las ${venta.fechaEscaneo}`
       });
       return;
     }
@@ -241,4 +272,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor activo en el puerto ${PORT}`));
+server.listen(PORT, () => console.log(`Servidor de Cena San Silvestre activo en puerto ${PORT}`));
