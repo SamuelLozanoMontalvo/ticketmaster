@@ -15,8 +15,6 @@
 </head>
 <body>
 
-  <div id="server-banner" style="display:none; background:#dc2626; color:#fff; padding:10px 16px; text-align:center; font-weight:600;"></div>
-
   <!-- Encabezado -->
   <header>
     <h1 id="app-title" style="cursor:pointer;" onclick="volverAlMapa()">Reserva de Boletos</h1>
@@ -28,7 +26,6 @@
       </div>
       <div id="user-info" style="display:none;">
         <span id="user-name"></span>
-        <button id="btn-panel-admin" onclick="irAPanelAdmin()" class="btn-nav" style="display:none; background:#2563eb; color:white; margin-left:10px;">Panel Admin</button>
         <button id="btn-mis-boletas" onclick="verMisBoletas()" class="btn-nav" style="background:#0284c7; color:white; margin-left:10px;">Mis Boletas</button>
         <button onclick="cerrarSesion()" class="btn-logout">Salir</button>
       </div>
@@ -137,10 +134,7 @@
 
     <div class="admin-sections">
       <div class="admin-box" style="flex: 2;">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-          <h3 style="margin:0;">Personas Registradas con Entradas</h3>
-          <button onclick="eliminarTodasLasBoletas()" style="background:#7f1d1d; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">🗑️ Eliminar TODAS las boletas</button>
-        </div>
+        <h3>Personas Registradas con Entradas</h3>
         <table>
           <thead>
             <tr>
@@ -221,7 +215,8 @@
         <div class="google-btn-wrapper">
           <div id="g_id_onload"
                data-client_id="18644068943-j2ij8oe9bnmjgk01e8rr5g8fvsito3je.apps.googleusercontent.com"
-               data-callback="handleCredentialResponse">
+               data-callback="handleCredentialResponse"
+               data-use_fedcm_for_prompt="false">
           </div>
           <div class="g_id_signin" data-type="standard"></div>
         </div>
@@ -294,7 +289,6 @@
       <div class="ticket-actions" data-html2canvas-ignore="true">
         <button onclick="imprimirComprobante()" class="btn-print">🖨️ Guardar PDF</button>
         <button onclick="compartirComprobante()" class="btn-share">📲 Compartir</button>
-        <button onclick="irAMisBoletasDesdeComprobante()" class="btn-share">🎟️ Ver en Mis Boletas</button>
         <button onclick="cerrarModal()" class="btn-close">Cerrar</button>
       </div>
     </div>
@@ -322,27 +316,16 @@
       const adminSaved = localStorage.getItem('ticket_admin');
       const staffSaved = localStorage.getItem('ticket_staff');
 
-      let adminParsed = null;
-      try { adminParsed = adminSaved ? JSON.parse(adminSaved) : null; } catch (e) {}
-      if (adminParsed && !adminParsed.token) { localStorage.removeItem('ticket_admin'); adminParsed = null; }
-
-      if (adminParsed) {
-        currentAdmin = adminParsed;
+      if (adminSaved) {
+        currentAdmin = JSON.parse(adminSaved);
         mostrarUsuarioEnHeader(`Admin (${currentAdmin.username})`, true, false);
-        reanudarSesionAdmin();
+        if (socket) socket.emit('ADMIN_LOGIN', currentAdmin);
       } else if (staffSaved) {
         currentStaff = JSON.parse(staffSaved);
         iniciarVistaStaff(currentStaff);
       } else if (userSaved) {
-        let u = null;
-        try { u = JSON.parse(userSaved); } catch (e) {}
-        // Sesiones viejas sin correo no pueden enlazarse con sus boletas: se piden iniciar de nuevo
-        if (u && u.email) {
-          currentUser = u;
-          mostrarUsuarioEnHeader(currentUser.nombre, false, false);
-        } else {
-          localStorage.removeItem('ticket_user');
-        }
+        currentUser = JSON.parse(userSaved);
+        mostrarUsuarioEnHeader(currentUser.nombre, false, false);
       }
     }
 
@@ -352,12 +335,11 @@
       document.getElementById('user-name').textContent = `Hola, ${nombre}`;
       
       const btnMisBoletas = document.getElementById('btn-mis-boletas');
-      if (esStaff) {
+      if (esAdmin || esStaff) {
         btnMisBoletas.style.display = 'none';
       } else {
         btnMisBoletas.style.display = 'inline-block';
       }
-      document.getElementById('btn-panel-admin').style.display = esAdmin ? 'inline-block' : 'none';
     }
 
     function ocultarTodasLasVistas() {
@@ -430,7 +412,6 @@
     function handleCredentialResponse(r) { const p = JSON.parse(atob(r.credential.split('.')[1])); autenticarUsuario({ nombre: p.name, email: p.email }); }
 
     function autenticarUsuario(u) {
-      u.email = (u.email || '').trim().toLowerCase();
       currentUser = u;
       localStorage.setItem('ticket_user', JSON.stringify(u));
       mostrarUsuarioEnHeader(currentUser.nombre, false, false);
@@ -438,8 +419,6 @@
     }
 
     function cerrarSesion() {
-      if (currentAdmin && socket) socket.emit('ADMIN_LOGOUT', { token: currentAdmin.token });
-      document.getElementById('btn-panel-admin').style.display = 'none';
       currentUser = null; currentAdmin = null; currentStaff = null;
       localStorage.removeItem('ticket_user');
       localStorage.removeItem('ticket_admin');
@@ -472,36 +451,14 @@
     if (socket) {
       socket.on('ADMIN_AUTH_SUCCESS', (data) => {
         cerrarModalPortal();
-        currentAdmin = { username: data.username, token: data.token };
+        currentAdmin = { username: data.username, password: document.getElementById('admin-pass').value || currentAdmin?.password };
         localStorage.setItem('ticket_admin', JSON.stringify(currentAdmin));
+        
+        ocultarTodasLasVistas();
+        document.getElementById('view-admin').style.setProperty('display', 'block', 'important');
+        document.getElementById('app-title').textContent = 'Panel de Administración';
         mostrarUsuarioEnHeader(`Admin (${data.username})`, true, false);
-        lastAdminData = data;
-        irAPanelAdmin();
-      });
-
-      // Sesión reanudada (recarga o reconexión): solo refresca datos, NO cambia de vista
-      socket.on('ADMIN_RESUMED', (data) => {
-        lastAdminData = data;
-        mostrarUsuarioEnHeader(`Admin (${data.username})`, true, false);
-        if (document.getElementById('view-admin').style.display === 'block') {
-          renderAdminData(data.sales, data.staffList, data.totalCapacity);
-        }
-      });
-
-      socket.on('ADMIN_DATA', (data) => {
-        lastAdminData = data;
         renderAdminData(data.sales, data.staffList, data.totalCapacity);
-      });
-
-      socket.on('ADMIN_SESSION_INVALID', () => {
-        if (!currentAdmin) return;
-        localStorage.removeItem('ticket_admin');
-        currentAdmin = null;
-        document.getElementById('btn-panel-admin').style.display = 'none';
-        document.getElementById('auth-buttons-group').setAttribute('style', 'display: flex !important');
-        document.getElementById('user-info').setAttribute('style', 'display: none !important');
-        volverAlMapa();
-        alert('Tu sesión de administrador expiró. Inicia sesión de nuevo en "Portal Admin / Staff".');
       });
 
       socket.on('STAFF_AUTH_SUCCESS', (staff) => {
@@ -511,45 +468,12 @@
         iniciarVistaStaff(staff);
       });
 
-      socket.on('ADMIN_ACTION_RESULT', (d) => alert(d.message));
-
-      // Detecta si Railway sigue con el server.js viejo o sin Volume
-      let serverInfoRecibido = false;
-      function mostrarBanner(txt) {
-        const b = document.getElementById('server-banner');
-        b.textContent = txt; b.style.display = 'block';
-      }
-      socket.on('SERVER_INFO', (info) => {
-        serverInfoRecibido = true;
-        const b = document.getElementById('server-banner');
-        if (!info.persistent) {
-          mostrarBanner('⚠️ El servidor no tiene almacenamiento persistente (Volume): las ventas se borran en cada reinicio/deploy.');
-        } else {
-          b.style.display = 'none';
-        }
-      });
-      socket.on('connect', () => {
-        serverInfoRecibido = false;
-        setTimeout(() => {
-          if (!serverInfoRecibido) mostrarBanner('⚠️ El servidor (Railway) está DESACTUALIZADO. Haz redeploy con el nuevo server.js o las compras saldrán con código "undefined".');
-        }, 3000);
-      });
       socket.on('ADMIN_AUTH_FAILED', (d) => alert(d.message));
       socket.on('STAFF_AUTH_FAILED', (d) => alert(d.message));
-    }
 
-    let lastAdminData = null;
-
-    function irAPanelAdmin() {
-      if (!currentAdmin) return abrirModalPortal();
-      ocultarTodasLasVistas();
-      document.getElementById('view-admin').style.setProperty('display', 'block', 'important');
-      document.getElementById('app-title').textContent = 'Panel de Administración';
-      if (lastAdminData) renderAdminData(lastAdminData.sales, lastAdminData.staffList, lastAdminData.totalCapacity);
-    }
-
-    function reanudarSesionAdmin() {
-      if (socket && currentAdmin && currentAdmin.token) socket.emit('ADMIN_RESUME', { token: currentAdmin.token });
+      socket.on('ADMIN_NEW_SALE', (sales) => {
+        if (currentAdmin) socket.emit('ADMIN_LOGIN', currentAdmin);
+      });
     }
 
     function iniciarVistaStaff(staff) {
@@ -560,105 +484,41 @@
       iniciarEscaner();
     }
 
-    // ---------- Helpers de puestos ----------
-    function esc(str) {
-      return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    }
-
-    // "C4-S7" -> { zona: 'Gold', mesa: 'C4', silla: '7' }
-    function infoPuesto(seatId) {
-      const m = /^([A-Z])(\d+)-S(\d+)$/.exec(seatId);
-      if (!m) return { zona: '-', mesa: seatId, silla: '-' };
-      let zona = '-';
-      Object.values(CONFIG).forEach(c => {
-        if (m[1] >= c.start && m[1] <= c.end) zona = c.zoneName.charAt(0) + c.zoneName.slice(1).toLowerCase();
-      });
-      return { zona, mesa: m[1] + m[2], silla: m[3] };
-    }
-
-    function etiquetaPuesto(seatId) {
-      const p = infoPuesto(seatId);
-      return `${p.zona} · Mesa ${p.mesa} · Silla ${p.silla}`;
-    }
-
-    // ---------- Mis Boletas ----------
     function verMisBoletas() {
-      if (!currentUser && !currentAdmin) return abrirModalAuth('login');
+      if (!currentUser) return abrirModalAuth('login');
       if (!socket) return;
 
       ocultarTodasLasVistas();
       document.getElementById('view-my-tickets').style.setProperty('display', 'block', 'important');
-      document.getElementById('my-tickets-container').innerHTML = '<p>Cargando tus entradas...</p>';
-      socket.emit('GET_USER_TICKETS', currentAdmin
-        ? { adminToken: currentAdmin.token }
-        : { cliente: currentUser.nombre, email: currentUser.email });
-    }
-
-    function renderMisBoletas(tickets) {
-      const container = document.getElementById('my-tickets-container');
-      if (!tickets || tickets.length === 0) {
-        container.style.textAlign = 'center';
-        container.innerHTML = `
-          <div style="padding: 20px 0;">
-            <h3 style="color: #64748b; margin-bottom: 15px;">No tienes entradas registradas.</h3>
-            <button onclick="volverAlMapa()" class="btn-submit" style="width: auto; padding: 10px 20px;">Obtener mis entradas</button>
-          </div>`;
-        return;
-      }
-
-      const lista = [...tickets].reverse(); // más recientes primero
-      container.style.textAlign = 'left';
-      container.innerHTML = lista.map(t => {
-        const filas = t.puestos.map(id => {
-          const p = infoPuesto(id);
-          return `<tr><td>${esc(p.zona)}</td><td>${esc(p.mesa)}</td><td>${esc(p.silla)}</td></tr>`;
-        }).join('');
-        const cod = esc(t.codigoCompra);
-        return `
-          <div class="mt-card" id="mt-card-${cod}">
-            <div class="mt-info">
-              <div class="mt-code">${cod}</div>
-              <div class="mt-meta"><b>Pedido:</b> #${esc(t.idPedido)}</div>
-              <div class="mt-meta"><b>Comprada el:</b> ${esc(t.fechaHora)}</div>
-              <div class="mt-meta"><b>Total:</b> $${Number(t.total).toLocaleString('es-CO')} COP</div>
-              <div class="mt-meta"><b>Estado:</b>
-                <span style="color:${t.usado ? '#ef4444' : '#16a34a'}; font-weight:bold;">${t.usado ? 'Usada' : 'Válida'}</span>
-              </div>
-              <table class="mt-seats">
-                <thead><tr><th>Zona</th><th>Mesa</th><th>Silla</th></tr></thead>
-                <tbody>${filas}</tbody>
-              </table>
-            </div>
-            <div class="mt-qr">
-              <canvas id="mt-qr-${cod}"></canvas>
-              <div class="mt-qr-code">${cod}</div>
-              <small>Presenta este QR en la entrada</small>
-              <button class="btn-submit mt-pdf" data-html2canvas-ignore="true" onclick="descargarBoletaPDF('${cod}')">🖨️ Descargar PDF</button>
-            </div>
-          </div>`;
-      }).join('');
-
-      lista.forEach(t => {
-        const canvas = document.getElementById(`mt-qr-${t.codigoCompra}`);
-        if (canvas && window.QRCode) {
-          QRCode.toCanvas(canvas, JSON.stringify({ codigo: t.codigoCompra, pedido: t.idPedido }), { width: 150 });
-        }
-      });
-    }
-
-    function descargarBoletaPDF(codigo) {
-      const el = document.getElementById(`mt-card-${codigo}`);
-      if (!el) return;
-      html2pdf().set({
-        margin: 10,
-        filename: `Boleta_${codigo}.pdf`,
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(el).save();
+      socket.emit('GET_USER_TICKETS', { cliente: currentUser.nombre });
     }
 
     if (socket) {
-      socket.on('USER_TICKETS_RESPONSE', renderMisBoletas);
+      socket.on('USER_TICKETS_RESPONSE', (tickets) => {
+        const container = document.getElementById('my-tickets-container');
+        if (!tickets || tickets.length === 0) {
+          container.innerHTML = `
+            <div style="padding: 20px 0;">
+              <h3 style="color: #64748b; margin-bottom: 15px;">No tienes entradas registradas.</h3>
+              <button onclick="volverAlMapa()" class="btn-submit" style="width: auto; padding: 10px 20px;">Obtener mis entradas</button>
+            </div>
+          `;
+          return;
+        }
+
+        let html = '<table><thead><tr><th>Código</th><th>Puestos</th><th>Fecha</th><th>Total</th><th>Estado</th></tr></thead><tbody>';
+        tickets.forEach(t => {
+          html += `<tr>
+            <td><strong>${t.codigoCompra}</strong></td>
+            <td>${t.puestos.join(', ')}</td>
+            <td>${t.fechaHora}</td>
+            <td>$${t.total.toLocaleString('es-CO')} COP</td>
+            <td><span style="color: ${t.usado ? '#ef4444' : '#22c55e'}; font-weight: bold;">${t.usado ? 'Usada' : 'Válida'}</span></td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+      });
     }
 
     function renderAdminData(sales, staffList, totalCapacity) {
@@ -678,10 +538,10 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td><strong>${s.codigoCompra}</strong></td>
-          <td>${esc(s.cliente)}</td>
+          <td>${s.cliente}</td>
           <td>${s.numEntradas}</td>
-          <td>${s.puestos.map(id => esc(etiquetaPuesto(id))).join('<br>')}</td>
-          <td>${esc(s.fechaHora)}</td>
+          <td>${s.puestos.join(', ')}</td>
+          <td>${s.fechaHora}</td>
           <td><span style="color: ${s.usado ? '#16a34a' : '#d97706'}; font-weight: bold;">${s.usado ? 'Ingresado' : 'Pendiente'}</span></td>
           <td><button onclick="eliminarEntrada('${s.codigoCompra}')" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px;">Eliminar</button></td>
         `;
@@ -697,15 +557,9 @@
       renderStaffList(staffList);
     }
 
-    function eliminarTodasLasBoletas() {
-      if (!socket || !currentAdmin) return;
-      const r = prompt('Esto borrará TODAS las boletas y liberará TODAS las sillas. Escribe BORRAR para confirmar:');
-      if (r && r.trim().toUpperCase() === 'BORRAR') socket.emit('RESET_ALL_SALES', { token: currentAdmin.token });
-    }
-
     function eliminarEntrada(codigoCompra) {
       if (confirm(`¿Estás seguro de eliminar la entrada ${codigoCompra}? Esta acción liberará los puestos en el mapa.`)) {
-        if (socket) socket.emit('DELETE_TICKET', { codigoCompra, token: currentAdmin ? currentAdmin.token : null });
+        if (socket) socket.emit('DELETE_TICKET', { codigoCompra });
       }
     }
 
@@ -715,9 +569,9 @@
       staffList.forEach(stf => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${esc(stf.id)}</td>
-          <td>${esc(stf.nombre)} ${esc(stf.apellido)}</td>
-          <td>${esc(stf.username)}</td>
+          <td>${stf.id}</td>
+          <td>${stf.nombre} ${stf.apellido}</td>
+          <td>${stf.username}</td>
           <td><button onclick="eliminarStaff('${stf.id}')" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px;">Eliminar</button></td>
         `;
         staffTbody.appendChild(tr);
@@ -726,7 +580,7 @@
 
     function eliminarStaff(staffId) {
       if (confirm('¿Estás seguro de eliminar este usuario Staff?')) {
-        if (socket) socket.emit('DELETE_STAFF', { staffId, token: currentAdmin ? currentAdmin.token : null });
+        if (socket) socket.emit('DELETE_STAFF', { staffId });
       }
     }
 
@@ -737,9 +591,9 @@
         nombre: document.getElementById('stf-nombre').value,
         apellido: document.getElementById('stf-apellido').value,
         username: document.getElementById('stf-username').value,
-        password: document.getElementById('stf-password').value,
-        token: currentAdmin ? currentAdmin.token : null
+        password: document.getElementById('stf-password').value
       });
+      alert('Usuario Staff creado exitosamente.');
       e.target.reset();
     }
 
@@ -839,31 +693,7 @@
     }
 
     if (socket) {
-      socket.on('MAP_STATE', (state) => {
-        lastMapState = state;
-        aplicarMapState();
-      });
-
-      // Se dispara al conectar Y en cada reconexión: reanuda admin y pide el mapa actual
-      socket.on('connect', () => {
-        reanudarSesionAdmin();
-        socket.emit('GET_MAP_STATE');
-      });
-
-      socket.on('PURCHASE_OK', (sale) => {
-        pendingPurchase = null;
-        if (!sale || !sale.codigoCompra || !Array.isArray(sale.puestos)) {
-          return alert('El servidor está desactualizado y no devolvió el código de la compra. Haz redeploy del backend en Railway.');
-        }
-        mostrarComprobante(sale);
-      });
-
-      socket.on('PURCHASE_FAILED', ({ message }) => {
-        pendingPurchase = null;
-        alert(message);
-      });
-
-      socket.on('LOCK_FAILED', ({ message }) => alert(message));
+      socket.on('MAP_STATE', (state) => Object.keys(state).forEach(id => actualizarEstadoUI(id, state[id].status, state[id].userId === socket.id)));
       socket.on('SEATS_LOCKED', ({ seatIds, userId, expiresAt }) => {
         const esMio = userId === socket.id;
         seatIds.forEach(id => {
@@ -883,24 +713,6 @@
       });
 
       socket.on('SEATS_SOLD', ({ seatIds }) => seatIds.forEach(id => actualizarEstadoUI(id, 'sold', false)));
-    }
-
-    let lastMapState = {};
-    let pendingPurchase = null;
-
-    // Pinta TODAS las sillas según el estado del servidor (las que no estén en el estado = disponibles)
-    function aplicarMapState() {
-      const mias = [];
-      document.querySelectorAll('.seat').forEach(el => {
-        const st = lastMapState[el.id];
-        if (!st) { el.className = 'seat available'; return; }
-        const esMio = st.status === 'locked' && st.userId === socket.id;
-        if (esMio) mias.push(el.id);
-        actualizarEstadoUI(el.id, st.status, esMio);
-      });
-      misSillasSeleccionadas = mias;
-      actualizarResumen();
-      if (mias.length === 0) detenerCuentaRegresiva();
     }
 
     function actualizarEstadoUI(seatId, status, esMio) {
@@ -955,49 +767,57 @@
     function procesarReserva() {
       const activeUser = currentUser || currentAdmin;
       if (!activeUser) return abrirModalAuth('login');
-      if (!socket || misSillasSeleccionadas.length === 0) return;
+      if (misSillasSeleccionadas.length === 0) return alert('Por favor selecciona al menos una silla.');
 
-      // El servidor genera código, pedido, total y fecha/hora
-      pendingPurchase = true;
-      socket.emit('CONFIRM_PURCHASE', {
-        seatIds: [...misSillasSeleccionadas],
-        cliente: currentAdmin ? `RESERVA ADMIN (${currentAdmin.username})` : activeUser.nombre,
-        email: currentAdmin ? null : (activeUser.email || null),
-        adminToken: currentAdmin ? currentAdmin.token : null
+      let total = 0;
+      misSillasSeleccionadas.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.dataset.precio) total += parseInt(el.dataset.precio);
       });
-    }
 
-    function mostrarComprobante(sale) {
-      document.getElementById('lbl-id-pedido').textContent = `#${sale.idPedido}`;
-      document.getElementById('lbl-nombre-cliente').textContent = sale.cliente;
-      document.getElementById('lbl-fecha-hora').textContent = sale.fechaHora;
-      document.getElementById('lbl-codigo-compra').textContent = sale.codigoCompra;
-      document.getElementById('lbl-puestos-detalles').textContent = sale.puestos.map(etiquetaPuesto).join(' | ');
-      document.getElementById('lbl-valor-pagar').textContent = `$${Number(sale.total).toLocaleString('es-CO')} COP`;
+      const idPedido = "ORD-" + Math.floor(100000 + Math.random() * 900000);
+      const codigoCompra = "TK-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+      const fechaHora = new Date().toLocaleString('es-CO');
+
+      const datosCompra = {
+        idPedido,
+        codigoCompra,
+        cliente: currentAdmin ? `RESERVA ADMIN (${currentAdmin.username})` : activeUser.nombre,
+        seatIds: misSillasSeleccionadas,
+        total,
+        fechaHora
+      };
+
+      document.getElementById('lbl-id-pedido').textContent = `#${idPedido}`;
+      document.getElementById('lbl-nombre-cliente').textContent = datosCompra.cliente;
+      document.getElementById('lbl-fecha-hora').textContent = fechaHora;
+      document.getElementById('lbl-codigo-compra').textContent = codigoCompra;
+      document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
+      document.getElementById('lbl-valor-pagar').textContent = `$${total.toLocaleString('es-CO')} COP`;
 
       setTimeout(() => {
         const canvas = document.getElementById('qr-canvas');
-        if (canvas) {
-          QRCode.toCanvas(canvas, JSON.stringify({ codigo: sale.codigoCompra, pedido: sale.idPedido }), { width: 130 });
+        if (canvas && typeof QRCode !== 'undefined') {
+          QRCode.toCanvas(canvas, JSON.stringify({ codigo: codigoCompra, pedido: idPedido }), { width: 130 });
         }
       }, 100);
 
+      if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
       document.getElementById('ticket-modal').style.display = 'flex';
-    }
-
-    function irAMisBoletasDesdeComprobante() {
-      cerrarModal();
-      verMisBoletas();
     }
 
     function imprimirComprobante() {
       const elemento = document.getElementById('ticket-content');
-      html2pdf().set({
-        margin: 10,
-        filename: `Comprobante_${document.getElementById('lbl-codigo-compra').textContent}.pdf`,
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(elemento).save();
+      if (typeof html2pdf !== 'undefined') {
+        html2pdf().set({
+          margin: 10,
+          filename: `Comprobante_${document.getElementById('lbl-codigo-compra').textContent}.pdf`,
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(elemento).save();
+      } else {
+        window.print();
+      }
     }
 
     function compartirComprobante() {
@@ -1013,13 +833,10 @@
       detenerCuentaRegresiva();
     }
 
-    function arrancarApp() {
+    window.onload = () => {
       inicializarMapa();
-      aplicarMapState();
       comprobarSesionGuardada();
-    }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancarApp);
-    else arrancarApp();
+    };
   </script>
 </body>
 </html>
