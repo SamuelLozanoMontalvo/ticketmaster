@@ -37,7 +37,7 @@ function cargarDatos() {
       );
       
       staffUsers = parsed.staffUsers || [];
-      console.log('Datos cargados desde data.json');
+      console.log('Datos cargados correctamente desde data.json');
     }
   } catch (err) {
     console.error('Error leyendo data.json:', err);
