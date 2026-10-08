@@ -83,6 +83,34 @@ function isAdmin(socket) {
   return socket.data.admin === true;
 }
 
+// Valida al admin por el socket O por su token de sesión. Así las acciones funcionan
+// aunque el socket se haya reconectado y todavía no haya reanudado la sesión.
+function requireAdmin(socket, token) {
+  if (isAdmin(socket)) return true;
+  const username = token && adminSessions[token];
+  if (username) {
+    socket.data.admin = true;
+    socket.data.adminUser = username;
+    socket.join('admins');
+    return true;
+  }
+  socket.emit('ADMIN_SESSION_INVALID');
+  return false;
+}
+
+const SEAT_RE = /^[A-L][1-5]-S([1-9]|10)$/;
+function precioSilla(seatId) {
+  const letra = seatId.charAt(0);
+  if (letra <= 'B') return 100000; // Diamond A-B
+  if (letra <= 'H') return 70000;  // Gold C-H
+  return 40000;                    // Silver I-L
+}
+function codigoUnico(prefix, genFn, campo) {
+  let c;
+  do { c = prefix + genFn(); } while (salesHistory.some(v => v[campo] === c));
+  return c;
+}
+
 io.on('connection', (socket) => {
   socket.emit('MAP_STATE', seatsState);
 
@@ -90,7 +118,7 @@ io.on('connection', (socket) => {
 
   // --- BLOQUEAR SILLAS (TEMPORAL) ---
   socket.on('LOCK_SEATS', ({ seatIds }) => {
-    if (!Array.isArray(seatIds)) return;
+    if (!Array.isArray(seatIds) || seatIds.length === 0 || !seatIds.every(id => SEAT_RE.test(id))) return;
     const allAvailable = seatIds.every(id => !seatsState[id] || seatsState[id].status === 'available');
 
     if (!allAvailable) {
@@ -157,31 +185,45 @@ io.on('connection', (socket) => {
       seatsState[seatId] = { status: 'sold' };
     });
 
-    salesHistory.push({
-      idPedido: datosCompra.idPedido,
-      codigoCompra: datosCompra.codigoCompra,
-      cliente: datosCompra.cliente,
-      email: datosCompra.email ? String(datosCompra.email).toLowerCase() : null,
+    // El servidor genera los códigos, el total y la fecha (no se confía en el cliente)
+    const adminUser = datosCompra.adminToken ? (adminSessions[datosCompra.adminToken] || null) : null;
+    const sale = {
+      idPedido: codigoUnico('ORD-', () => String(Math.floor(100000 + Math.random() * 900000)), 'idPedido'),
+      codigoCompra: codigoUnico('TK-', () => crypto.randomBytes(4).toString('hex').substring(0, 6).toUpperCase(), 'codigoCompra'),
+      cliente: adminUser ? `RESERVA ADMIN (${adminUser})` : String(datosCompra.cliente || 'Cliente'),
+      email: !adminUser && datosCompra.email ? String(datosCompra.email).toLowerCase() : null,
+      adminUser,
       numEntradas: seatIds.length,
       puestos: seatIds,
-      total: datosCompra.total,
-      fechaHora: datosCompra.fechaHora,
+      total: seatIds.reduce((acc, id) => acc + precioSilla(id), 0),
+      fechaHora: new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' }),
+      fechaISO: new Date().toISOString(),
       usado: false,
       escaneadoPor: null,
       fechaEscaneo: null
-    });
+    };
+    salesHistory.push(sale);
     guardarDatos();
 
-    socket.emit('PURCHASE_OK', { codigoCompra: datosCompra.codigoCompra });
+    socket.emit('PURCHASE_OK', sale);
     io.emit('SEATS_SOLD', { seatIds });
     broadcastAdminData();
   });
 
   // --- CONSULTAR ENTRADAS DE CLIENTE ---
-  socket.on('GET_USER_TICKETS', ({ cliente, email }) => {
+  socket.on('GET_USER_TICKETS', ({ cliente, email, adminToken } = {}) => {
+    // Un admin ve las reservas que hizo él mismo
+    const adminUser = adminToken ? adminSessions[adminToken] : null;
+    if (adminUser) {
+      const etiqueta = `RESERVA ADMIN (${adminUser})`;
+      socket.emit('USER_TICKETS_RESPONSE', salesHistory.filter(v =>
+        v.adminUser === adminUser || (!v.adminUser && v.cliente === etiqueta)
+      ));
+      return;
+    }
     const mail = email ? String(email).toLowerCase() : null;
     socket.emit('USER_TICKETS_RESPONSE', salesHistory.filter(v =>
-      (mail && v.email === mail) || (!v.email && v.cliente === cliente)
+      (mail && v.email === mail) || (!v.email && !v.adminUser && v.cliente === cliente)
     ));
   });
 
@@ -229,13 +271,14 @@ io.on('connection', (socket) => {
   });
 
   // --- ELIMINAR BOLETA VENDIDA (ADMIN) ---
-  socket.on('DELETE_TICKET', ({ codigoCompra }) => {
-    if (!isAdmin(socket)) {
-      socket.emit('ADMIN_SESSION_INVALID');
+  socket.on('DELETE_TICKET', ({ codigoCompra, token } = {}) => {
+    if (!requireAdmin(socket, token)) return;
+    const index = salesHistory.findIndex(v => v.codigoCompra === codigoCompra);
+    if (index === -1) {
+      socket.emit('ADMIN_ACTION_RESULT', { ok: false, message: 'Esa boleta ya no existe.' });
+      socket.emit('ADMIN_DATA', adminPayload());
       return;
     }
-    const index = salesHistory.findIndex(v => v.codigoCompra === codigoCompra);
-    if (index === -1) return;
 
     const ticket = salesHistory[index];
     ticket.puestos.forEach(seatId => {
@@ -247,34 +290,43 @@ io.on('connection', (socket) => {
 
     io.emit('SEATS_RELEASED', { seatIds: ticket.puestos });
     broadcastAdminData();
+    socket.emit('ADMIN_ACTION_RESULT', { ok: true, message: `Boleta ${codigoCompra} eliminada. Las sillas quedaron libres.` });
   });
 
   // --- CREAR / ELIMINAR STAFF (ADMIN) ---
-  socket.on('CREATE_STAFF', (staffData) => {
-    if (!isAdmin(socket)) {
-      socket.emit('ADMIN_SESSION_INVALID');
+  socket.on('CREATE_STAFF', (staffData = {}) => {
+    if (!requireAdmin(socket, staffData.token)) return;
+    const username = String(staffData.username || '').trim();
+    if (!staffData.nombre || !staffData.apellido || !username || !staffData.password) {
+      socket.emit('ADMIN_ACTION_RESULT', { ok: false, message: 'Completa todos los campos del staff.' });
+      return;
+    }
+    if (staffUsers.some(s => s.username === username)) {
+      socket.emit('ADMIN_ACTION_RESULT', { ok: false, message: 'Ese username de staff ya existe.' });
       return;
     }
     staffUsers.push({
       id: 'STF-' + crypto.randomBytes(3).toString('hex').toUpperCase(),
       nombre: staffData.nombre,
       apellido: staffData.apellido,
-      username: staffData.username,
+      username,
       password: staffData.password,
       fechaCreacion: new Date().toLocaleDateString('es-CO')
     });
     guardarDatos();
     broadcastAdminData();
+    socket.emit('ADMIN_ACTION_RESULT', { ok: true, message: 'Usuario Staff creado exitosamente.' });
   });
 
-  socket.on('DELETE_STAFF', ({ staffId }) => {
-    if (!isAdmin(socket)) {
-      socket.emit('ADMIN_SESSION_INVALID');
-      return;
-    }
+  socket.on('DELETE_STAFF', ({ staffId, token } = {}) => {
+    if (!requireAdmin(socket, token)) return;
+    const antes = staffUsers.length;
     staffUsers = staffUsers.filter(s => s.id !== staffId);
     guardarDatos();
     broadcastAdminData();
+    socket.emit('ADMIN_ACTION_RESULT', antes === staffUsers.length
+      ? { ok: false, message: 'Ese usuario staff ya no existe.' }
+      : { ok: true, message: 'Usuario Staff eliminado.' });
   });
 
   // --- VALIDACIÓN QR (STAFF) ---
