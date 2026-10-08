@@ -90,6 +90,14 @@ header h1 {
   margin-bottom: 15px; 
 }
 
+/* Ocultar las vistas privadas por defecto para que no aparezcan abajo */
+#view-admin, 
+#view-staff, 
+#view-my-tickets {
+  display: none !important;
+}
+
+
 #selected-list { 
   padding-left: 20px; 
   min-height: 80px; 
