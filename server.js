@@ -5,7 +5,6 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Habilitar CORS sin restricciones para Netlify
 const io = new Server(server, {
   cors: {
     origin: '*',
@@ -15,7 +14,6 @@ const io = new Server(server, {
 
 app.use(express.static(__dirname));
 
-// Estado en memoria
 const seatsState = {};
 const activeTimers = {};
 const LOCK_TIME_MS = 5 * 60 * 1000;
@@ -25,10 +23,8 @@ const staffUsers = [];
 const ADMIN_USER = { username: 'admin', password: 'admin123password' };
 
 io.on('connection', (socket) => {
-  // Enviar estado actual del mapa al conectarse
   socket.emit('MAP_STATE', seatsState);
 
-  // --- GESTIÓN DE SILLAS Y BLOQUEOS ---
   socket.on('LOCK_SEATS', ({ seatIds }) => {
     const expiresAt = Date.now() + LOCK_TIME_MS;
     const allAvailable = seatIds.every(id => !seatsState[id] || seatsState[id].status === 'available');
@@ -64,7 +60,6 @@ io.on('connection', (socket) => {
     if (unlocked.length > 0) io.emit('SEATS_RELEASED', { seatIds: unlocked });
   });
 
-  // --- CONFIRMACIÓN Y REGISTRO DE COMPRA ---
   socket.on('CONFIRM_PURCHASE', (datosCompra) => {
     datosCompra.seatIds.forEach(seatId => {
       if (seatsState[seatId]) seatsState[seatId].status = 'sold';
@@ -88,7 +83,12 @@ io.on('connection', (socket) => {
     io.emit('ADMIN_NEW_SALE', nuevaVenta);
   });
 
-  // --- AUTENTICACIÓN ADMIN Y STAFF ---
+  // OBTENER MIS BOLETAS
+  socket.on('GET_USER_TICKETS', ({ cliente }) => {
+    const userTickets = salesHistory.filter(v => v.cliente === cliente);
+    socket.emit('USER_TICKETS_RESPONSE', userTickets);
+  });
+
   socket.on('ADMIN_LOGIN', ({ username, password }) => {
     if (username === ADMIN_USER.username && password === ADMIN_USER.password) {
       socket.emit('ADMIN_AUTH_SUCCESS', {
@@ -110,7 +110,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // --- GESTIÓN DE STAFF ---
   socket.on('CREATE_STAFF', (staffData) => {
     const newStaff = {
       id: 'STF-' + Math.floor(1000 + Math.random() * 9000),
@@ -125,7 +124,6 @@ io.on('connection', (socket) => {
     io.emit('STAFF_LIST_UPDATED', staffUsers);
   });
 
-  // --- VALIDACIÓN DE ENTRADAS (STAFF) ---
   socket.on('VALIDATE_TICKET', ({ codigo, staffUsername }) => {
     const venta = salesHistory.find(v => v.codigoCompra === codigo || v.idPedido === codigo);
 
