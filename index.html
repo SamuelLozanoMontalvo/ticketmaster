@@ -829,26 +829,28 @@
     }
 
     function actualizarEstadoUI(seatId, status, esMio) {
-      const el = document.getElementById(seatId);
-      if (!el) return;
+  const el = document.getElementById(seatId);
+  if (!el) return;
 
-      el.classList.remove('available', 'my-selection', 'locked', 'sold');
+  // 1. Limpiar todas las clases posibles previamente asignadas
+  el.classList.remove('available', 'my-selection', 'locked', 'sold');
 
-      if (status === 'sold') {
-        el.classList.add('sold');
-        el.onclick = null;
-      } else if (status === 'locked') {
-        if (esMio) {
-          el.classList.add('my-selection');
-        } else {
-          el.classList.add('locked');
-          el.onclick = null;
-        }
-      } else {
-        el.classList.add('available');
-        el.onclick = (e) => { e.stopPropagation(); toggleSilla(seatId); };
-      }
+  // 2. Asignar el estado correcto
+  if (status === 'sold') {
+    el.classList.add('sold');
+    el.onclick = null; // Desactivar clics
+  } else if (status === 'locked') {
+    if (esMio) {
+      el.classList.add('my-selection');
+    } else {
+      el.classList.add('locked');
+      el.onclick = null;
     }
+  } else {
+    el.classList.add('available');
+    el.onclick = (e) => { e.stopPropagation(); toggleSilla(seatId); };
+  }
+}
 
     if (socket) {
       socket.on('MAP_STATE', (state) => {
