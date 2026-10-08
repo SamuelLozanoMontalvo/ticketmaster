@@ -15,6 +15,8 @@
 </head>
 <body>
 
+  <div id="server-banner" style="display:none; background:#dc2626; color:#fff; padding:10px 16px; text-align:center; font-weight:600;"></div>
+
   <!-- Encabezado -->
   <header>
     <h1 id="app-title" style="cursor:pointer;" onclick="volverAlMapa()">Reserva de Boletos</h1>
@@ -135,7 +137,10 @@
 
     <div class="admin-sections">
       <div class="admin-box" style="flex: 2;">
-        <h3>Personas Registradas con Entradas</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <h3 style="margin:0;">Personas Registradas con Entradas</h3>
+          <button onclick="eliminarTodasLasBoletas()" style="background:#7f1d1d; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">🗑️ Eliminar TODAS las boletas</button>
+        </div>
         <table>
           <thead>
             <tr>
@@ -507,6 +512,28 @@
       });
 
       socket.on('ADMIN_ACTION_RESULT', (d) => alert(d.message));
+
+      // Detecta si Railway sigue con el server.js viejo o sin Volume
+      let serverInfoRecibido = false;
+      function mostrarBanner(txt) {
+        const b = document.getElementById('server-banner');
+        b.textContent = txt; b.style.display = 'block';
+      }
+      socket.on('SERVER_INFO', (info) => {
+        serverInfoRecibido = true;
+        const b = document.getElementById('server-banner');
+        if (!info.persistent) {
+          mostrarBanner('⚠️ El servidor no tiene almacenamiento persistente (Volume): las ventas se borran en cada reinicio/deploy.');
+        } else {
+          b.style.display = 'none';
+        }
+      });
+      socket.on('connect', () => {
+        serverInfoRecibido = false;
+        setTimeout(() => {
+          if (!serverInfoRecibido) mostrarBanner('⚠️ El servidor (Railway) está DESACTUALIZADO. Haz redeploy con el nuevo server.js o las compras saldrán con código "undefined".');
+        }, 3000);
+      });
       socket.on('ADMIN_AUTH_FAILED', (d) => alert(d.message));
       socket.on('STAFF_AUTH_FAILED', (d) => alert(d.message));
     }
@@ -670,6 +697,12 @@
       renderStaffList(staffList);
     }
 
+    function eliminarTodasLasBoletas() {
+      if (!socket || !currentAdmin) return;
+      const r = prompt('Esto borrará TODAS las boletas y liberará TODAS las sillas. Escribe BORRAR para confirmar:');
+      if (r && r.trim().toUpperCase() === 'BORRAR') socket.emit('RESET_ALL_SALES', { token: currentAdmin.token });
+    }
+
     function eliminarEntrada(codigoCompra) {
       if (confirm(`¿Estás seguro de eliminar la entrada ${codigoCompra}? Esta acción liberará los puestos en el mapa.`)) {
         if (socket) socket.emit('DELETE_TICKET', { codigoCompra, token: currentAdmin ? currentAdmin.token : null });
@@ -819,6 +852,9 @@
 
       socket.on('PURCHASE_OK', (sale) => {
         pendingPurchase = null;
+        if (!sale || !sale.codigoCompra || !Array.isArray(sale.puestos)) {
+          return alert('El servidor está desactualizado y no devolvió el código de la compra. Haz redeploy del backend en Railway.');
+        }
         mostrarComprobante(sale);
       });
 
