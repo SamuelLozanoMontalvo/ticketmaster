@@ -1,8 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,7 +13,11 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-const DATA_FILE = path.join(__dirname, 'data.json');
+// Configuración de conexión a PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:KkTyOoYeNvXtdFBPbMpChSDJhTwXiWrj@postgres.railway.internal:5432/railway',
+  ssl: process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('railway.internal') ? { rejectUnauthorized: false } : false
+});
 
 let seatsState = {};
 let salesHistory = [];
@@ -22,38 +25,83 @@ let staffUsers = [];
 const activeTimers = {};
 const LOCK_TIME_MS = 5 * 60 * 1000;
 
-function cargarDatos() {
+// Creación de tablas e inicialización en PostgreSQL
+async function initDB() {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const rawData = fs.readFileSync(DATA_FILE, 'utf8');
-      const parsed = JSON.parse(rawData);
-      seatsState = parsed.seatsState || {};
-      salesHistory = parsed.salesHistory || [];
-      staffUsers = parsed.staffUsers || [];
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ventas (
+        id SERIAL PRIMARY KEY,
+        id_pedido VARCHAR(50) UNIQUE NOT NULL,
+        codigo_compra VARCHAR(50) UNIQUE NOT NULL,
+        cliente VARCHAR(100) NOT NULL,
+        num_entradas INT NOT NULL,
+        puestos TEXT[] NOT NULL,
+        total INT NOT NULL,
+        fecha_hora VARCHAR(100) NOT NULL,
+        usado BOOLEAN DEFAULT FALSE,
+        escaneado_por VARCHAR(100),
+        fecha_escaneo VARCHAR(100)
+      );
 
-      // Forzar que todo lo presente en salesHistory se marque como 'sold'
-      salesHistory.forEach(venta => {
-        if (venta.puestos && Array.isArray(venta.puestos)) {
-          venta.puestos.forEach(seatId => {
-            seatsState[seatId] = { status: 'sold' };
-          });
-        }
-      });
-    }
+      CREATE TABLE IF NOT EXISTS staff (
+        id VARCHAR(50) PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL,
+        apellido VARCHAR(100) NOT NULL,
+        username VARCHAR(100) UNIQUE NOT NULL,
+        password VARCHAR(100) NOT NULL,
+        fecha_creacion VARCHAR(50) NOT NULL
+      );
+    `);
+    console.log('✅ Tablas de PostgreSQL listas.');
+    await cargarDatosDB();
   } catch (err) {
-    console.error('Error leyendo data.json:', err);
+    console.error('❌ Error inicializando PostgreSQL:', err);
   }
 }
 
-function guardarDatos() {
+async function cargarDatosDB() {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ seatsState, salesHistory, staffUsers }, null, 2), 'utf8');
+    const salesRes = await pool.query('SELECT * FROM ventas ORDER BY id ASC');
+    salesHistory = salesRes.rows.map(r => ({
+      idPedido: r.id_pedido,
+      codigoCompra: r.codigo_compra,
+      cliente: r.cliente,
+      numEntradas: r.num_entradas,
+      puestos: r.puestos,
+      total: r.total,
+      fechaHora: r.fecha_hora,
+      usado: r.usado,
+      escaneadoPor: r.escaneado_por,
+      fechaEscaneo: r.fecha_escaneo
+    }));
+
+    const staffRes = await pool.query('SELECT * FROM staff');
+    staffUsers = staffRes.rows.map(r => ({
+      id: r.id,
+      nombre: r.nombre,
+      apellido: r.apellido,
+      username: r.username,
+      password: r.password,
+      fechaCreacion: r.fecha_creacion
+    }));
+
+    // Sincronizar el estado permanente del mapa en memoria
+    seatsState = {};
+    salesHistory.forEach(venta => {
+      if (venta.puestos && Array.isArray(venta.puestos)) {
+        venta.puestos.forEach(seatId => {
+          seatsState[seatId] = { status: 'sold' };
+        });
+      }
+    });
+
+    console.log(`[PostgreSQL] Datos restaurados: ${salesHistory.length} ventas activas.`);
   } catch (err) {
-    console.error('Error guardando en data.json:', err);
+    console.error('❌ Error leyendo registros de PostgreSQL:', err);
   }
 }
 
-cargarDatos();
+initDB();
 
 const ADMIN_USERS = [
   { username: 'admin', password: 'admin123password' },
@@ -95,9 +143,7 @@ function obtenerZonaPuesto(seatId) {
   return 'NOMAD';
 }
 
-// Función auxiliar para emitir el mapa garantizado
 function enviarEstadoConsolidado(targetSocket) {
-  // Asegurar que las sillas vendidas de salesHistory siempre estén registradas en seatsState
   salesHistory.forEach(v => {
     if (v.puestos) {
       v.puestos.forEach(s => {
@@ -114,7 +160,6 @@ function enviarEstadoConsolidado(targetSocket) {
 }
 
 io.on('connection', (socket) => {
-  // Enviar estado al conectar
   enviarEstadoConsolidado(socket);
 
   socket.on('GET_MAP_STATE', () => {
@@ -137,12 +182,10 @@ io.on('connection', (socket) => {
       activeTimers[seatId] = setTimeout(() => {
         delete seatsState[seatId];
         delete activeTimers[seatId];
-        guardarDatos();
         io.emit('SEATS_RELEASED', { seatIds: [seatId] });
       }, LOCK_TIME_MS);
     });
 
-    guardarDatos();
     io.emit('SEATS_LOCKED', { seatIds, userId: socket.id, expiresAt });
   });
 
@@ -156,12 +199,11 @@ io.on('connection', (socket) => {
       }
     });
     if (unlocked.length > 0) {
-      guardarDatos();
       io.emit('SEATS_RELEASED', { seatIds: unlocked });
     }
   });
 
-  socket.on('CONFIRM_PURCHASE', (datosCompra) => {
+  socket.on('CONFIRM_PURCHASE', async (datosCompra) => {
     if (!datosCompra || !datosCompra.seatIds || datosCompra.seatIds.length === 0) return;
 
     const etapa = obtenerEtapaServidor();
@@ -188,11 +230,19 @@ io.on('connection', (socket) => {
       fechaEscaneo: null
     };
 
-    salesHistory.push(nuevaVenta);
-    guardarDatos();
+    try {
+      await pool.query(
+        `INSERT INTO ventas (id_pedido, codigo_compra, cliente, num_entradas, puestos, total, fecha_hora)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [nuevaVenta.idPedido, nuevaVenta.codigoCompra, nuevaVenta.cliente, nuevaVenta.numEntradas, nuevaVenta.puestos, nuevaVenta.total, nuevaVenta.fechaHora]
+      );
+      salesHistory.push(nuevaVenta);
 
-    io.emit('SEATS_SOLD', { seatIds: datosCompra.seatIds });
-    io.emit('ADMIN_NEW_SALE', salesHistory);
+      io.emit('SEATS_SOLD', { seatIds: datosCompra.seatIds });
+      io.emit('ADMIN_NEW_SALE', salesHistory);
+    } catch (err) {
+      console.error('Error insertando venta en PostgreSQL:', err);
+    }
   });
 
   socket.on('GET_USER_TICKETS', ({ cliente }) => {
@@ -219,23 +269,28 @@ io.on('connection', (socket) => {
     else socket.emit('STAFF_AUTH_FAILED', { message: 'Credenciales de Staff no encontradas.' });
   });
 
-  socket.on('DELETE_TICKET', ({ codigoCompra }) => {
-    const index = salesHistory.findIndex(v => v.codigoCompra === codigoCompra);
-    if (index !== -1) {
-      const ticket = salesHistory[index];
-      ticket.puestos.forEach(seatId => {
-        delete seatsState[seatId];
-        if (activeTimers[seatId]) clearTimeout(activeTimers[seatId]);
-      });
-      salesHistory.splice(index, 1);
-      guardarDatos();
+  socket.on('DELETE_TICKET', async ({ codigoCompra }) => {
+    try {
+      const index = salesHistory.findIndex(v => v.codigoCompra === codigoCompra);
+      if (index !== -1) {
+        const ticket = salesHistory[index];
+        await pool.query('DELETE FROM ventas WHERE codigo_compra = $1', [codigoCompra]);
 
-      io.emit('SEATS_RELEASED', { seatIds: ticket.puestos });
-      io.emit('ADMIN_NEW_SALE', salesHistory);
+        ticket.puestos.forEach(seatId => {
+          delete seatsState[seatId];
+          if (activeTimers[seatId]) clearTimeout(activeTimers[seatId]);
+        });
+        salesHistory.splice(index, 1);
+
+        io.emit('SEATS_RELEASED', { seatIds: ticket.puestos });
+        io.emit('ADMIN_NEW_SALE', salesHistory);
+      }
+    } catch (err) {
+      console.error('Error eliminando ticket en PostgreSQL:', err);
     }
   });
 
-  socket.on('CREATE_STAFF', (staffData) => {
+  socket.on('CREATE_STAFF', async (staffData) => {
     const newStaff = {
       id: 'STF-' + Math.floor(1000 + Math.random() * 9000),
       nombre: staffData.nombre,
@@ -244,18 +299,31 @@ io.on('connection', (socket) => {
       password: staffData.password,
       fechaCreacion: new Date().toLocaleDateString('es-CO')
     };
-    staffUsers.push(newStaff);
-    guardarDatos();
-    io.emit('STAFF_LIST_UPDATED', staffUsers);
+
+    try {
+      await pool.query(
+        `INSERT INTO staff (id, nombre, apellido, username, password, fecha_creacion)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [newStaff.id, newStaff.nombre, newStaff.apellido, newStaff.username, newStaff.password, newStaff.fechaCreacion]
+      );
+      staffUsers.push(newStaff);
+      io.emit('STAFF_LIST_UPDATED', staffUsers);
+    } catch (err) {
+      console.error('Error creando staff en PostgreSQL:', err);
+    }
   });
 
-  socket.on('DELETE_STAFF', ({ staffId }) => {
-    staffUsers = staffUsers.filter(s => s.id !== staffId);
-    guardarDatos();
-    io.emit('STAFF_LIST_UPDATED', staffUsers);
+  socket.on('DELETE_STAFF', async ({ staffId }) => {
+    try {
+      await pool.query('DELETE FROM staff WHERE id = $1', [staffId]);
+      staffUsers = staffUsers.filter(s => s.id !== staffId);
+      io.emit('STAFF_LIST_UPDATED', staffUsers);
+    } catch (err) {
+      console.error('Error eliminando staff en PostgreSQL:', err);
+    }
   });
 
-  socket.on('VALIDATE_TICKET', ({ codigo, staffUsername }) => {
+  socket.on('VALIDATE_TICKET', async ({ codigo, staffUsername }) => {
     const venta = salesHistory.find(v => v.codigoCompra === codigo || v.idPedido === codigo);
 
     if (!venta) {
@@ -271,17 +339,26 @@ io.on('connection', (socket) => {
       return;
     }
 
-    venta.usado = true;
-    venta.escaneadoPor = staffUsername;
-    venta.fechaEscaneo = new Date().toLocaleTimeString('es-CO');
-    guardarDatos();
+    const fechaEscaneo = new Date().toLocaleTimeString('es-CO');
+    try {
+      await pool.query(
+        'UPDATE ventas SET usado = TRUE, escaneado_por = $1, fecha_escaneo = $2 WHERE codigo_compra = $3 OR id_pedido = $3',
+        [staffUsername, fechaEscaneo, codigo]
+      );
 
-    socket.emit('VALIDATION_RESULT', {
-      status: 'VALID',
-      message: `✅ ENTRADA VÁLIDA - ¡PUEDE PASAR!\nCliente: ${venta.cliente}\nPuestos: ${venta.puestos.join(', ')}`
-    });
+      venta.usado = true;
+      venta.escaneadoPor = staffUsername;
+      venta.fechaEscaneo = fechaEscaneo;
 
-    io.emit('ADMIN_NEW_SALE', salesHistory);
+      socket.emit('VALIDATION_RESULT', {
+        status: 'VALID',
+        message: `✅ ENTRADA VÁLIDA - ¡PUEDE PASAR!\nCliente: ${venta.cliente}\nPuestos: ${venta.puestos.join(', ')}`
+      });
+
+      io.emit('ADMIN_NEW_SALE', salesHistory);
+    } catch (err) {
+      console.error('Error validando ticket en PostgreSQL:', err);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -294,11 +371,10 @@ io.on('connection', (socket) => {
       }
     });
     if (userSeats.length > 0) {
-      guardarDatos();
       io.emit('SEATS_RELEASED', { seatIds: userSeats });
     }
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor de Cena San Silvestre activo en puerto ${PORT}`));
+server.listen(PORT, () => console.log(`Servidor activo en el puerto ${PORT}`));
