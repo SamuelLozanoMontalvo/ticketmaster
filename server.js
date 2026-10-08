@@ -30,6 +30,16 @@ function cargarDatos() {
       seatsState = parsed.seatsState || {};
       salesHistory = parsed.salesHistory || [];
       staffUsers = parsed.staffUsers || [];
+
+      // RECONSTRUCCIÓN DE SEGURIDAD:
+      // Re-sincronizar el mapa seatsState con todas las compras históricas en salesHistory
+      salesHistory.forEach(venta => {
+        if (venta.puestos && Array.isArray(venta.puestos)) {
+          venta.puestos.forEach(seatId => {
+            seatsState[seatId] = { status: 'sold' };
+          });
+        }
+      });
     }
   } catch (err) {
     console.error('Error leyendo data.json:', err);
@@ -51,7 +61,6 @@ const ADMIN_USERS = [
   { username: 'admindos', password: 'emhotelsadmin31' }
 ];
 
-// MATRIZ DE PRECIOS DEL SERVIDOR (Preventa, Etapa 2, Full)
 const TABLA_PRECIOS_SERVER = {
   PREVENTA: {
     SAHARA: { ADULTO: 1050000, NINO: 420000 },
@@ -89,6 +98,7 @@ function obtenerZonaPuesto(seatId) {
 
 // Lógica de Socket.io
 io.on('connection', (socket) => {
+  // Enviar el estado real y guardado del mapa a cada usuario nuevo o al refrescar
   socket.emit('MAP_STATE', seatsState);
 
   socket.on('LOCK_SEATS', ({ seatIds }) => {
@@ -134,12 +144,14 @@ io.on('connection', (socket) => {
   socket.on('CONFIRM_PURCHASE', (datosCompra) => {
     if (!datosCompra || !datosCompra.seatIds || datosCompra.seatIds.length === 0) return;
 
-    // Calcular el total real en el servidor para evitar manipulaciones de precio
     const etapa = obtenerEtapaServidor();
     let totalVerificado = 0;
 
+    // REGISTRO PERMANENTE DE SILLAS VENDIDAS
     datosCompra.seatIds.forEach(seatId => {
       if (activeTimers[seatId]) clearTimeout(activeTimers[seatId]);
+      
+      // Se guarda como 'sold' en el objeto persistente
       seatsState[seatId] = { status: 'sold' };
 
       const zona = obtenerZonaPuesto(seatId);
@@ -160,8 +172,11 @@ io.on('connection', (socket) => {
     };
 
     salesHistory.push(nuevaVenta);
+    
+    // GUARDAR EN DISCO EN DATA.JSON
     guardarDatos();
 
+    // EMITIR EVENTO EN TIEMPO REAL A TODOS
     io.emit('SEATS_SOLD', { seatIds: datosCompra.seatIds });
     io.emit('ADMIN_NEW_SALE', salesHistory);
   });
@@ -199,6 +214,8 @@ io.on('connection', (socket) => {
         if (activeTimers[seatId]) clearTimeout(activeTimers[seatId]);
       });
       salesHistory.splice(index, 1);
+      
+      // Guardar cambios al liberar/eliminar
       guardarDatos();
 
       io.emit('SEATS_RELEASED', { seatIds: ticket.puestos });
