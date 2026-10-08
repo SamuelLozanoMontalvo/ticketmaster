@@ -1,6 +1,8 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,15 +16,47 @@ const io = new Server(server, {
 
 app.use(express.static(__dirname));
 
-// Estado en memoria
-const seatsState = {};
+// --- PERSISTENCIA EN ARCHIVO DATA.JSON ---
+const DATA_FILE = path.join(__dirname, 'data.json');
+
+let seatsState = {};
+let salesHistory = [];
+let staffUsers = [];
 const activeTimers = {};
 const LOCK_TIME_MS = 5 * 60 * 1000;
 
-let salesHistory = [];
-let staffUsers = [];
+function cargarDatos() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const rawData = fs.readFileSync(DATA_FILE, 'utf8');
+      const parsed = JSON.parse(rawData);
+      seatsState = parsed.seatsState || {};
+      salesHistory = parsed.salesHistory || [];
+      staffUsers = parsed.staffUsers || [];
+      console.log('Datos cargados exitosamente desde data.json');
+    }
+  } catch (err) {
+    console.error('Error leyendo data.json:', err);
+  }
+}
 
-// Lista de Administradores
+function guardarDatos() {
+  try {
+    const dataToSave = {
+      seatsState,
+      salesHistory,
+      staffUsers
+    };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(dataToSave, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error guardando en data.json:', err);
+  }
+}
+
+// Cargar al arrancar
+cargarDatos();
+
+// Credenciales Administradores
 const ADMIN_USERS = [
   { username: 'admin', password: 'admin123password' },
   { username: 'admindos', password: 'emhotelsadmin31' }
@@ -31,7 +65,7 @@ const ADMIN_USERS = [
 io.on('connection', (socket) => {
   socket.emit('MAP_STATE', seatsState);
 
-  // --- GESTIÓN DE SILLAS Y BLOQUEOS ---
+  // --- BLOQUEAR SILLAS (TEMPORAL) ---
   socket.on('LOCK_SEATS', ({ seatIds }) => {
     const expiresAt = Date.now() + LOCK_TIME_MS;
     const allAvailable = seatIds.every(id => !seatsState[id] || seatsState[id].status === 'available');
@@ -48,10 +82,12 @@ io.on('connection', (socket) => {
       activeTimers[seatId] = setTimeout(() => {
         delete seatsState[seatId];
         delete activeTimers[seatId];
+        guardarDatos();
         io.emit('SEATS_RELEASED', { seatIds: [seatId] });
       }, LOCK_TIME_MS);
     });
 
+    guardarDatos();
     io.emit('SEATS_LOCKED', { seatIds, userId: socket.id, expiresAt });
   });
 
@@ -64,12 +100,16 @@ io.on('connection', (socket) => {
         unlocked.push(seatId);
       }
     });
-    if (unlocked.length > 0) io.emit('SEATS_RELEASED', { seatIds: unlocked });
+    if (unlocked.length > 0) {
+      guardarDatos();
+      io.emit('SEATS_RELEASED', { seatIds: unlocked });
+    }
   });
 
-  // --- CONFIRMACIÓN Y REGISTRO DE COMPRA ---
+  // --- COMPRA / APARTADO VENDIDO ---
   socket.on('CONFIRM_PURCHASE', (datosCompra) => {
     datosCompra.seatIds.forEach(seatId => {
+      if (activeTimers[seatId]) clearTimeout(activeTimers[seatId]);
       seatsState[seatId] = { status: 'sold' };
     });
 
@@ -87,22 +127,24 @@ io.on('connection', (socket) => {
     };
 
     salesHistory.push(nuevaVenta);
+    guardarDatos();
+
     io.emit('SEATS_SOLD', { seatIds: datosCompra.seatIds });
     io.emit('ADMIN_NEW_SALE', salesHistory);
   });
 
-  // --- CONSULTAR BOLETAS DE USUARIO ---
+  // --- CONSULTAR ENTRADAS DE CLIENTE ---
   socket.on('GET_USER_TICKETS', ({ cliente }) => {
     const userTickets = salesHistory.filter(v => v.cliente === cliente);
     socket.emit('USER_TICKETS_RESPONSE', userTickets);
   });
 
-  // --- AUTENTICACIÓN ADMIN Y STAFF ---
+  // --- LOGIN ADMIN ---
   socket.on('ADMIN_LOGIN', ({ username, password }) => {
-    const isAdminValid = ADMIN_USERS.some(a => a.username === username && a.password === password);
-    if (isAdminValid) {
+    const foundAdmin = ADMIN_USERS.find(a => a.username === username && a.password === password);
+    if (foundAdmin) {
       socket.emit('ADMIN_AUTH_SUCCESS', {
-        username,
+        username: foundAdmin.username,
         sales: salesHistory,
         staffList: staffUsers,
         totalCapacity: 600
@@ -112,6 +154,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // --- LOGIN STAFF ---
   socket.on('STAFF_LOGIN', ({ username, password }) => {
     const foundStaff = staffUsers.find(s => s.username === username && s.password === password);
     if (foundStaff) {
@@ -121,22 +164,24 @@ io.on('connection', (socket) => {
     }
   });
 
-  // --- ACCIONES DE ADMINISTRADOR (ELIMINAR ENTRADAS Y STAFF) ---
+  // --- ELIMINAR BOLETA VENDIDA (ADMIN) ---
   socket.on('DELETE_TICKET', ({ codigoCompra }) => {
-    const ticketIndex = salesHistory.findIndex(v => v.codigoCompra === codigoCompra);
-    if (ticketIndex !== -1) {
-      const ticket = salesHistory[ticketIndex];
-      // Liberar los puestos en el mapa
+    const index = salesHistory.findIndex(v => v.codigoCompra === codigoCompra);
+    if (index !== -1) {
+      const ticket = salesHistory[index];
       ticket.puestos.forEach(seatId => {
         delete seatsState[seatId];
+        if (activeTimers[seatId]) clearTimeout(activeTimers[seatId]);
       });
-      salesHistory.splice(ticketIndex, 1);
+      salesHistory.splice(index, 1);
+      guardarDatos();
 
       io.emit('SEATS_RELEASED', { seatIds: ticket.puestos });
       io.emit('ADMIN_NEW_SALE', salesHistory);
     }
   });
 
+  // --- CREAR / ELIMINAR STAFF (ADMIN) ---
   socket.on('CREATE_STAFF', (staffData) => {
     const newStaff = {
       id: 'STF-' + Math.floor(1000 + Math.random() * 9000),
@@ -148,15 +193,17 @@ io.on('connection', (socket) => {
     };
 
     staffUsers.push(newStaff);
+    guardarDatos();
     io.emit('STAFF_LIST_UPDATED', staffUsers);
   });
 
   socket.on('DELETE_STAFF', ({ staffId }) => {
     staffUsers = staffUsers.filter(s => s.id !== staffId);
+    guardarDatos();
     io.emit('STAFF_LIST_UPDATED', staffUsers);
   });
 
-  // --- VALIDACIÓN DE ENTRADAS (STAFF) ---
+  // --- VALIDACIÓN QR (STAFF) ---
   socket.on('VALIDATE_TICKET', ({ codigo, staffUsername }) => {
     const venta = salesHistory.find(v => v.codigoCompra === codigo || v.idPedido === codigo);
 
@@ -176,6 +223,7 @@ io.on('connection', (socket) => {
     venta.usado = true;
     venta.escaneadoPor = staffUsername;
     venta.fechaEscaneo = new Date().toLocaleTimeString('es-CO');
+    guardarDatos();
 
     socket.emit('VALIDATION_RESULT', {
       status: 'VALID',
@@ -194,7 +242,10 @@ io.on('connection', (socket) => {
         userSeats.push(seatId);
       }
     });
-    if (userSeats.length > 0) io.emit('SEATS_RELEASED', { seatIds: userSeats });
+    if (userSeats.length > 0) {
+      guardarDatos();
+      io.emit('SEATS_RELEASED', { seatIds: userSeats });
+    }
   });
 });
 
