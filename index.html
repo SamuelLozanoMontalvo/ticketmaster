@@ -13,7 +13,6 @@
   <script src="https://cdn.jsdelivr.net/npm/kjua@0.9.0/dist/kjua.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <script src="https://checkout.wompi.co/widget.js"></script>
   
   <!-- SweetAlert2, Confetti & Lucide -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -247,9 +246,9 @@
 
       <!-- Formulario Registro -->
       <form id="form-register" class="auth-form" style="display: none;" onsubmit="registroNormal(event)">
-        <div style="display: flex; gap: 10px;">
-          <input type="text" id="reg-name" placeholder="Nombre" style="flex:1;" required>
-          <input type="text" id="reg-lastname" placeholder="Apellido" style="flex:1;" required>
+        <div class="form-row">
+          <input type="text" id="reg-name" placeholder="Nombre" required>
+          <input type="text" id="reg-lastname" placeholder="Apellido" required>
         </div>
         <input type="tel" id="reg-phone" placeholder="Número de Celular" required>
         <input type="email" id="reg-email" placeholder="Correo electrónico" required>
@@ -922,49 +921,18 @@
         fechaHora
       };
 
-      if (total === 0) {
-        if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
+      if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
 
-        document.getElementById('lbl-id-pedido').textContent = `#${idPedido}`;
-        document.getElementById('lbl-nombre-cliente').textContent = datosCompra.cliente;
-        document.getElementById('lbl-fecha-hora').textContent = fechaHora;
-        document.getElementById('lbl-codigo-compra').textContent = codigoCompra;
-        document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
-        document.getElementById('lbl-valor-pagar').textContent = `$0 COP (Gratis)`;
+      document.getElementById('lbl-id-pedido').textContent = `#${idPedido}`;
+      document.getElementById('lbl-nombre-cliente').textContent = datosCompra.cliente;
+      document.getElementById('lbl-fecha-hora').textContent = fechaHora;
+      document.getElementById('lbl-codigo-compra').textContent = codigoCompra;
+      document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
+      document.getElementById('lbl-valor-pagar').textContent = `$${total.toLocaleString('es-CO')} COP`;
 
-        renderizarQR(codigoCompra, idPedido);
-        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
-        document.getElementById('ticket-modal').style.display = 'flex';
-        return;
-      }
-
-      if (typeof WidgetCheckout !== 'undefined') {
-        const checkout = new WidgetCheckout({
-          currency: 'COP',
-          amountInCents: total * 100,
-          reference: codigoCompra,
-          publicKey: 'pub_test_Q5y13W9zRPlmG2A6ujL399kL9x345678',
-          redirectUrl: window.location.href,
-          extra: { seatIds: misSillasSeleccionadas, cliente: datosCompra.cliente }
-        });
-
-        checkout.open(function (result) {
-          if (result.transaction.status === 'APPROVED') {
-            if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
-
-            document.getElementById('lbl-id-pedido').textContent = `#${idPedido}`;
-            document.getElementById('lbl-nombre-cliente').textContent = datosCompra.cliente;
-            document.getElementById('lbl-fecha-hora').textContent = fechaHora;
-            document.getElementById('lbl-codigo-compra').textContent = codigoCompra;
-            document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
-            document.getElementById('lbl-valor-pagar').textContent = `$${total.toLocaleString('es-CO')} COP`;
-
-            renderizarQR(codigoCompra, idPedido);
-            confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
-            document.getElementById('ticket-modal').style.display = 'flex';
-          }
-        });
-      }
+      renderizarQR(codigoCompra, idPedido);
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+      document.getElementById('ticket-modal').style.display = 'flex';
     }
 
     function imprimirComprobante() {
