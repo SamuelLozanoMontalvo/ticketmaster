@@ -237,14 +237,20 @@ header h1 {
 
 .btn-buy-table {
   display: block;
-  font-size: 0.6rem;
-  padding: 2px 4px;
-  background-color: #0284c7;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  margin-top: 2px;
+  font-size: 0.65rem;
+  padding: 4px 8px;
+  background-color: #1e293b; /* Negro suave / Gris muy oscuro */
+  color: #ffffff;            /* Letras blancas */
+  border: 1px solid #334155;  /* Borde discreto para dar estructura */
+  border-radius: 6px;        /* Esquinas suavizadas / redondeadas */
+  margin-top: 4px;
   cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+}
+
+.btn-buy-table:hover {
+  background-color: #334155; /* Tono un poco más claro al pasar el cursor */
 }
 
 /* SILLAS (Estilos y Colores Estrictos) */
