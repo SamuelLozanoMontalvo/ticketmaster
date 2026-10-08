@@ -417,6 +417,7 @@
     function handleCredentialResponse(r) { const p = JSON.parse(atob(r.credential.split('.')[1])); autenticarUsuario({ nombre: p.name, email: p.email }); }
 
     function autenticarUsuario(u) {
+      u.email = (u.email || '').trim().toLowerCase();
       currentUser = u;
       localStorage.setItem('ticket_user', JSON.stringify(u));
       mostrarUsuarioEnHeader(currentUser.nombre, false, false);
@@ -529,7 +530,7 @@
 
       ocultarTodasLasVistas();
       document.getElementById('view-my-tickets').style.setProperty('display', 'block', 'important');
-      socket.emit('GET_USER_TICKETS', { cliente: currentUser.nombre });
+      socket.emit('GET_USER_TICKETS', { cliente: currentUser.nombre, email: currentUser.email });
     }
 
     if (socket) {
@@ -857,6 +858,7 @@
         idPedido,
         codigoCompra,
         cliente: currentAdmin ? `RESERVA ADMIN (${currentAdmin.username})` : activeUser.nombre,
+        email: currentAdmin ? null : (activeUser.email || null),
         seatIds: [...misSillasSeleccionadas],
         total,
         fechaHora
