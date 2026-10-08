@@ -31,7 +31,7 @@ function cargarDatos() {
       salesHistory = parsed.salesHistory || [];
       staffUsers = parsed.staffUsers || [];
 
-      // Re-sincronizar el mapa seatsState con todas las compras históricas
+      // Forzar que todo lo presente en salesHistory se marque como 'sold'
       salesHistory.forEach(venta => {
         if (venta.puestos && Array.isArray(venta.puestos)) {
           venta.puestos.forEach(seatId => {
@@ -60,7 +60,6 @@ const ADMIN_USERS = [
   { username: 'admindos', password: 'emhotelsadmin31' }
 ];
 
-// MATRIZ DE PRECIOS DEL SERVIDOR (Preventa, Etapa 2, Full)
 const TABLA_PRECIOS_SERVER = {
   PREVENTA: {
     SAHARA: { ADULTO: 1050000, NINO: 420000 },
@@ -96,14 +95,30 @@ function obtenerZonaPuesto(seatId) {
   return 'NOMAD';
 }
 
-// Lógica de Socket.io
-io.on('connection', (socket) => {
-  // Enviar el estado real del mapa al conectar
-  socket.emit('MAP_STATE', seatsState);
+// Función auxiliar para emitir el mapa garantizado
+function enviarEstadoConsolidado(targetSocket) {
+  // Asegurar que las sillas vendidas de salesHistory siempre estén registradas en seatsState
+  salesHistory.forEach(v => {
+    if (v.puestos) {
+      v.puestos.forEach(s => {
+        seatsState[s] = { status: 'sold' };
+      });
+    }
+  });
 
-  // Petición explícita desde el cliente al refrescar la página
+  if (targetSocket) {
+    targetSocket.emit('MAP_STATE', seatsState);
+  } else {
+    io.emit('MAP_STATE', seatsState);
+  }
+}
+
+io.on('connection', (socket) => {
+  // Enviar estado al conectar
+  enviarEstadoConsolidado(socket);
+
   socket.on('GET_MAP_STATE', () => {
-    socket.emit('MAP_STATE', seatsState);
+    enviarEstadoConsolidado(socket);
   });
 
   socket.on('LOCK_SEATS', ({ seatIds }) => {
@@ -152,7 +167,6 @@ io.on('connection', (socket) => {
     const etapa = obtenerEtapaServidor();
     let totalVerificado = 0;
 
-    // Marcado permanente de sillas vendidas
     datosCompra.seatIds.forEach(seatId => {
       if (activeTimers[seatId]) clearTimeout(activeTimers[seatId]);
       seatsState[seatId] = { status: 'sold' };
