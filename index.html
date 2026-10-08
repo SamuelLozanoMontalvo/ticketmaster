@@ -32,7 +32,7 @@
     </div>
   </header>
 
-  <!-- VISTA CLIENTE (MAPA) -->
+  <!-- VISTA CLIENTE / MAPA -->
   <main id="view-client" class="main-layout">
     <section class="control-panel">
       <h2>Tu Selección</h2>
@@ -106,7 +106,7 @@
   <div id="view-admin" style="display: none; padding: 20px; max-width: 1400px; margin: 0 auto;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h2>Panel de Control Administrador</h2>
-      <button onclick="volverAlMapa()" class="btn-submit" style="width: auto; padding: 8px 16px; background: #64748b;">Volver al Mapa</button>
+      <button onclick="volverAlMapa()" class="btn-submit" style="width: auto; padding: 8px 16px; background: #2563eb;">Ir al Mapa para Apartar/Vender</button>
     </div>
 
     <div class="stats-grid" style="grid-template-columns: repeat(5, 1fr);">
@@ -197,7 +197,7 @@
     </div>
   </div>
 
-  <!-- Modal Autenticación Cliente -->
+  <!-- Modales -->
   <div id="auth-modal" class="modal-overlay" style="display: none;">
     <div class="auth-card">
       <div class="auth-tabs">
@@ -239,7 +239,6 @@
     </div>
   </div>
 
-  <!-- Modal Portal Admin / Staff -->
   <div id="portal-modal" class="modal-overlay" style="display: none;">
     <div class="auth-card">
       <div class="auth-tabs">
@@ -265,7 +264,6 @@
     </div>
   </div>
 
-  <!-- Modal Comprobante -->
   <div id="ticket-modal" class="modal-overlay" style="display: none;">
     <div class="ticket-card" id="ticket-content">
       <div class="ticket-header">
@@ -319,22 +317,28 @@
 
       if (adminSaved) {
         currentAdmin = JSON.parse(adminSaved);
-        mostrarUsuarioEnHeader(`Admin (${currentAdmin.username})`, true);
+        mostrarUsuarioEnHeader(`Admin (${currentAdmin.username})`, true, false);
         if (socket) socket.emit('ADMIN_LOGIN', currentAdmin);
       } else if (staffSaved) {
         currentStaff = JSON.parse(staffSaved);
         iniciarVistaStaff(currentStaff);
       } else if (userSaved) {
         currentUser = JSON.parse(userSaved);
-        mostrarUsuarioEnHeader(currentUser.nombre, false);
+        mostrarUsuarioEnHeader(currentUser.nombre, false, false);
       }
     }
 
-    function mostrarUsuarioEnHeader(nombre, esAdmin = false) {
+    function mostrarUsuarioEnHeader(nombre, esAdmin = false, esStaff = false) {
       document.getElementById('auth-buttons-group').setAttribute('style', 'display: none !important');
       document.getElementById('user-info').setAttribute('style', 'display: block !important');
       document.getElementById('user-name').textContent = `Hola, ${nombre}`;
-      document.getElementById('btn-mis-boletas').style.display = esAdmin ? 'none' : 'inline-block';
+      
+      const btnMisBoletas = document.getElementById('btn-mis-boletas');
+      if (esAdmin || esStaff) {
+        btnMisBoletas.style.display = 'none';
+      } else {
+        btnMisBoletas.style.display = 'inline-block';
+      }
     }
 
     function ocultarTodasLasVistas() {
@@ -409,7 +413,7 @@
     function autenticarUsuario(u) {
       currentUser = u;
       localStorage.setItem('ticket_user', JSON.stringify(u));
-      mostrarUsuarioEnHeader(currentUser.nombre, false);
+      mostrarUsuarioEnHeader(currentUser.nombre, false, false);
       cerrarModalAuth();
     }
 
@@ -428,8 +432,8 @@
       e.preventDefault();
       if (!socket) return alert("Error de conexión con el servidor.");
       const creds = {
-        username: document.getElementById('admin-user').value,
-        password: document.getElementById('admin-pass').value
+        username: document.getElementById('admin-user').value.trim(),
+        password: document.getElementById('admin-pass').value.trim()
       };
       socket.emit('ADMIN_LOGIN', creds);
     }
@@ -438,8 +442,8 @@
       e.preventDefault();
       if (!socket) return alert("Error de conexión con el servidor.");
       socket.emit('STAFF_LOGIN', {
-        username: document.getElementById('staff-user').value,
-        password: document.getElementById('staff-pass').value
+        username: document.getElementById('staff-user').value.trim(),
+        password: document.getElementById('staff-pass').value.trim()
       });
     }
 
@@ -452,7 +456,7 @@
         ocultarTodasLasVistas();
         document.getElementById('view-admin').style.setProperty('display', 'block', 'important');
         document.getElementById('app-title').textContent = 'Panel de Administración';
-        mostrarUsuarioEnHeader(`Admin (${data.username})`, true);
+        mostrarUsuarioEnHeader(`Admin (${data.username})`, true, false);
         renderAdminData(data.sales, data.staffList, data.totalCapacity);
       });
 
@@ -465,6 +469,7 @@
 
       socket.on('ADMIN_AUTH_FAILED', (d) => alert(d.message));
       socket.on('STAFF_AUTH_FAILED', (d) => alert(d.message));
+
       socket.on('ADMIN_NEW_SALE', (sales) => {
         if (currentAdmin) socket.emit('ADMIN_LOGIN', currentAdmin);
       });
@@ -474,7 +479,7 @@
       ocultarTodasLasVistas();
       document.getElementById('view-staff').style.setProperty('display', 'block', 'important');
       document.getElementById('app-title').textContent = `Módulo Escáner - ${staff.nombre}`;
-      mostrarUsuarioEnHeader(`Staff: ${staff.nombre}`, false);
+      mostrarUsuarioEnHeader(`Staff: ${staff.nombre}`, false, true);
       iniciarEscaner();
     }
 
@@ -734,6 +739,13 @@
         });
         btn.disabled = false;
       }
+
+      if (currentAdmin) {
+        btn.textContent = 'Apartar / Vender (Modo Admin)';
+      } else {
+        btn.textContent = 'Generar Comprobante';
+      }
+
       totalEl.textContent = `$${total.toLocaleString('es-CO')} COP`;
     }
 
@@ -765,7 +777,7 @@
       const datosCompra = {
         idPedido,
         codigoCompra,
-        cliente: activeUser.nombre || activeUser.username,
+        cliente: currentAdmin ? `RESERVA ADMIN (${currentAdmin.username})` : activeUser.nombre,
         seatIds: misSillasSeleccionadas,
         total,
         fechaHora
