@@ -14,17 +14,24 @@ const io = new Server(server, {
 
 app.use(express.static(__dirname));
 
+// Estado en memoria
 const seatsState = {};
 const activeTimers = {};
 const LOCK_TIME_MS = 5 * 60 * 1000;
 
-const salesHistory = [];
-const staffUsers = [];
-const ADMIN_USER = { username: 'admin', password: 'admin123password' };
+let salesHistory = [];
+let staffUsers = [];
+
+// Lista de Administradores
+const ADMIN_USERS = [
+  { username: 'admin', password: 'admin123password' },
+  { username: 'admindos', password: 'emhotelsadmin31' }
+];
 
 io.on('connection', (socket) => {
   socket.emit('MAP_STATE', seatsState);
 
+  // --- GESTIÓN DE SILLAS Y BLOQUEOS ---
   socket.on('LOCK_SEATS', ({ seatIds }) => {
     const expiresAt = Date.now() + LOCK_TIME_MS;
     const allAvailable = seatIds.every(id => !seatsState[id] || seatsState[id].status === 'available');
@@ -60,9 +67,10 @@ io.on('connection', (socket) => {
     if (unlocked.length > 0) io.emit('SEATS_RELEASED', { seatIds: unlocked });
   });
 
+  // --- CONFIRMACIÓN Y REGISTRO DE COMPRA ---
   socket.on('CONFIRM_PURCHASE', (datosCompra) => {
     datosCompra.seatIds.forEach(seatId => {
-      if (seatsState[seatId]) seatsState[seatId].status = 'sold';
+      seatsState[seatId] = { status: 'sold' };
     });
 
     const nuevaVenta = {
@@ -80,18 +88,21 @@ io.on('connection', (socket) => {
 
     salesHistory.push(nuevaVenta);
     io.emit('SEATS_SOLD', { seatIds: datosCompra.seatIds });
-    io.emit('ADMIN_NEW_SALE', nuevaVenta);
+    io.emit('ADMIN_NEW_SALE', salesHistory);
   });
 
-  // OBTENER MIS BOLETAS
+  // --- CONSULTAR BOLETAS DE USUARIO ---
   socket.on('GET_USER_TICKETS', ({ cliente }) => {
     const userTickets = salesHistory.filter(v => v.cliente === cliente);
     socket.emit('USER_TICKETS_RESPONSE', userTickets);
   });
 
+  // --- AUTENTICACIÓN ADMIN Y STAFF ---
   socket.on('ADMIN_LOGIN', ({ username, password }) => {
-    if (username === ADMIN_USER.username && password === ADMIN_USER.password) {
+    const isAdminValid = ADMIN_USERS.some(a => a.username === username && a.password === password);
+    if (isAdminValid) {
       socket.emit('ADMIN_AUTH_SUCCESS', {
+        username,
         sales: salesHistory,
         staffList: staffUsers,
         totalCapacity: 600
@@ -110,6 +121,22 @@ io.on('connection', (socket) => {
     }
   });
 
+  // --- ACCIONES DE ADMINISTRADOR (ELIMINAR ENTRADAS Y STAFF) ---
+  socket.on('DELETE_TICKET', ({ codigoCompra }) => {
+    const ticketIndex = salesHistory.findIndex(v => v.codigoCompra === codigoCompra);
+    if (ticketIndex !== -1) {
+      const ticket = salesHistory[ticketIndex];
+      // Liberar los puestos en el mapa
+      ticket.puestos.forEach(seatId => {
+        delete seatsState[seatId];
+      });
+      salesHistory.splice(ticketIndex, 1);
+
+      io.emit('SEATS_RELEASED', { seatIds: ticket.puestos });
+      io.emit('ADMIN_NEW_SALE', salesHistory);
+    }
+  });
+
   socket.on('CREATE_STAFF', (staffData) => {
     const newStaff = {
       id: 'STF-' + Math.floor(1000 + Math.random() * 9000),
@@ -124,6 +151,12 @@ io.on('connection', (socket) => {
     io.emit('STAFF_LIST_UPDATED', staffUsers);
   });
 
+  socket.on('DELETE_STAFF', ({ staffId }) => {
+    staffUsers = staffUsers.filter(s => s.id !== staffId);
+    io.emit('STAFF_LIST_UPDATED', staffUsers);
+  });
+
+  // --- VALIDACIÓN DE ENTRADAS (STAFF) ---
   socket.on('VALIDATE_TICKET', ({ codigo, staffUsername }) => {
     const venta = salesHistory.find(v => v.codigoCompra === codigo || v.idPedido === codigo);
 
@@ -149,7 +182,7 @@ io.on('connection', (socket) => {
       message: `✅ ENTRADA VÁLIDA - ¡PUEDE PASAR!\nCliente: ${venta.cliente}\nPuestos: ${venta.puestos.join(', ')}`
     });
 
-    io.emit('ADMIN_TICKET_SCANNED', salesHistory);
+    io.emit('ADMIN_NEW_SALE', salesHistory);
   });
 
   socket.on('disconnect', () => {
