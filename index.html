@@ -7,7 +7,7 @@
   
   <link rel="stylesheet" href="style.css">
 
-  <!-- Carga de Librerías Vía CDN (Evita error 404 en Netlify) -->
+  <!-- Carga de Librerías Vía CDN -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
@@ -27,6 +27,7 @@
       </div>
       <div id="user-info" style="display:none;">
         <span id="user-name"></span>
+        <button id="btn-mis-boletas" onclick="verMisBoletas()" class="btn-nav" style="background:#0284c7; color:white; margin-left:10px;">Mis Boletas</button>
         <button onclick="cerrarSesion()" class="btn-logout">Salir</button>
       </div>
     </div>
@@ -57,23 +58,52 @@
       </div>
 
       <div class="zones-wrapper">
-        <div class="zone-block diamond">
-          <h3>Zona Diamond ($100.000 COP/puesto)</h3>
-          <div class="tables-grid" id="zone-diamond"></div>
+        <!-- Acordeón Zona Diamond -->
+        <div class="zone-accordion">
+          <button class="accordion-header active" onclick="toggleZone('diamond')">
+            <span>Zona Diamond ($100.000 COP/puesto)</span>
+            <span class="icon">▼</span>
+          </button>
+          <div class="accordion-content open" id="zone-content-diamond">
+            <div class="tables-grid" id="zone-diamond"></div>
+          </div>
         </div>
 
-        <div class="zone-block gold">
-          <h3>Zona Gold ($70.000 COP/puesto)</h3>
-          <div class="tables-grid" id="zone-gold"></div>
+        <!-- Acordeón Zona Gold -->
+        <div class="zone-accordion">
+          <button class="accordion-header" onclick="toggleZone('gold')">
+            <span>Zona Gold ($70.000 COP/puesto)</span>
+            <span class="icon">►</span>
+          </button>
+          <div class="accordion-content" id="zone-content-gold">
+            <div class="tables-grid" id="zone-gold"></div>
+          </div>
         </div>
 
-        <div class="zone-block silver">
-          <h3>Zona Silver ($40.000 COP/puesto)</h3>
-          <div class="tables-grid" id="zone-silver"></div>
+        <!-- Acordeón Zona Silver -->
+        <div class="zone-accordion">
+          <button class="accordion-header" onclick="toggleZone('silver')">
+            <span>Zona Silver ($40.000 COP/puesto)</span>
+            <span class="icon">►</span>
+          </button>
+          <div class="accordion-content" id="zone-content-silver">
+            <div class="tables-grid" id="zone-silver"></div>
+          </div>
         </div>
       </div>
     </section>
   </main>
+
+  <!-- VISTA MIS BOLETAS (CLIENTE) -->
+  <div id="view-my-tickets" class="admin-dashboard">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h2>Mis Boletas Compradas</h2>
+      <button onclick="volverAlMapa()" class="btn-submit" style="width: auto;">Volver al Mapa</button>
+    </div>
+    <div id="my-tickets-container" class="admin-box" style="margin-top: 20px;">
+      <p>Cargando tus boletas...</p>
+    </div>
+  </div>
 
   <!-- VISTA ADMIN -->
   <div id="view-admin" class="admin-dashboard">
@@ -256,7 +286,6 @@
   </div>
 
   <script>
-    // Conexión explicita al backend de Railway
     const socket = typeof io !== 'undefined' ? io('https://ticketmaster-production.up.railway.app') : null;
     
     let currentUser = null;
@@ -271,6 +300,52 @@
       GOLD: { start: 'C', end: 'H', zoneName: 'GOLD' },
       SILVER: { start: 'I', end: 'L', zoneName: 'SILVER' }
     };
+
+    // PERSISTENCIA DE SESIÓN CON LOCALSTORAGE
+    function comprobarSesionGuardada() {
+      const userSaved = localStorage.getItem('ticket_user');
+      const staffSaved = localStorage.getItem('ticket_staff');
+
+      if (userSaved) {
+        currentUser = JSON.parse(userSaved);
+        mostrarUsuarioEnHeader(currentUser.nombre);
+      } else if (staffSaved) {
+        currentStaff = JSON.parse(staffSaved);
+        iniciarVistaStaff(currentStaff);
+      }
+    }
+
+    function mostrarUsuarioEnHeader(nombre) {
+      document.getElementById('auth-buttons-group').style.display = 'none';
+      document.getElementById('user-info').style.display = 'block';
+      document.getElementById('user-name').textContent = `Hola, ${nombre}`;
+    }
+
+    function toggleZone(selectedZone) {
+      const zones = ['diamond', 'gold', 'silver'];
+      zones.forEach(z => {
+        const content = document.getElementById(`zone-content-${z}`);
+        const header = content.previousElementSibling;
+        const icon = header.querySelector('.icon');
+
+        if (z === selectedZone) {
+          const isOpen = content.classList.contains('open');
+          if (!isOpen) {
+            content.classList.add('open');
+            header.classList.add('active');
+            icon.textContent = '▼';
+          } else {
+            content.classList.remove('open');
+            header.classList.remove('active');
+            icon.textContent = '►';
+          }
+        } else {
+          content.classList.remove('open');
+          header.classList.remove('active');
+          icon.textContent = '►';
+        }
+      });
+    }
 
     function abrirModalAuth(modo = 'login') { cambiarTab(modo); document.getElementById('auth-modal').style.display = 'flex'; }
     function cerrarModalAuth() { document.getElementById('auth-modal').style.display = 'none'; }
@@ -304,26 +379,28 @@
 
     function autenticarUsuario(u) {
       currentUser = u;
-      document.getElementById('auth-buttons-group').style.display = 'none';
-      document.getElementById('user-info').style.display = 'block';
-      document.getElementById('user-name').textContent = `Hola, ${currentUser.nombre}`;
+      localStorage.setItem('ticket_user', JSON.stringify(u));
+      mostrarUsuarioEnHeader(currentUser.nombre);
       cerrarModalAuth();
     }
 
     function cerrarSesion() {
       currentUser = null; currentStaff = null;
+      localStorage.removeItem('ticket_user');
+      localStorage.removeItem('ticket_staff');
       document.getElementById('auth-buttons-group').style.display = 'flex';
       document.getElementById('user-info').style.display = 'none';
       document.getElementById('view-client').style.display = 'flex';
       document.getElementById('view-admin').style.display = 'none';
       document.getElementById('view-staff').style.display = 'none';
+      document.getElementById('view-my-tickets').style.display = 'none';
       document.getElementById('app-title').textContent = 'Reserva de Boletos';
       if (html5QrcodeScanner) html5QrcodeScanner.clear();
     }
 
     function loginAdmin(e) {
       e.preventDefault();
-      if (!socket) return alert("Error de conexión con el servidor.");
+      if (!socket) return alert("Error de conexión.");
       socket.emit('ADMIN_LOGIN', {
         username: document.getElementById('admin-user').value,
         password: document.getElementById('admin-pass').value
@@ -332,7 +409,7 @@
 
     function loginStaff(e) {
       e.preventDefault();
-      if (!socket) return alert("Error de conexión con el servidor.");
+      if (!socket) return alert("Error de conexión.");
       socket.emit('STAFF_LOGIN', {
         username: document.getElementById('staff-user').value,
         password: document.getElementById('staff-pass').value
@@ -344,29 +421,70 @@
         cerrarModalPortal();
         document.getElementById('view-client').style.display = 'none';
         document.getElementById('view-staff').style.display = 'none';
+        document.getElementById('view-my-tickets').style.display = 'none';
         document.getElementById('view-admin').style.display = 'block';
         document.getElementById('app-title').textContent = 'Panel de Administración';
-        document.getElementById('auth-buttons-group').style.display = 'none';
-        document.getElementById('user-info').style.display = 'block';
-        document.getElementById('user-name').textContent = 'Modo: Administrador';
+        mostrarUsuarioEnHeader('Administrador');
         renderAdminData(data.sales, data.staffList, data.totalCapacity);
       });
 
       socket.on('STAFF_AUTH_SUCCESS', (staff) => {
         cerrarModalPortal();
         currentStaff = staff;
-        document.getElementById('view-client').style.display = 'none';
-        document.getElementById('view-admin').style.display = 'none';
-        document.getElementById('view-staff').style.display = 'block';
-        document.getElementById('app-title').textContent = `Módulo de Escaneo - ${staff.nombre}`;
-        document.getElementById('auth-buttons-group').style.display = 'none';
-        document.getElementById('user-info').style.display = 'block';
-        document.getElementById('user-name').textContent = `Staff: ${staff.nombre}`;
-        iniciarEscaner();
+        localStorage.setItem('ticket_staff', JSON.stringify(staff));
+        iniciarVistaStaff(staff);
       });
 
       socket.on('ADMIN_AUTH_FAILED', (d) => alert(d.message));
       socket.on('STAFF_AUTH_FAILED', (d) => alert(d.message));
+    }
+
+    function iniciarVistaStaff(staff) {
+      document.getElementById('view-client').style.display = 'none';
+      document.getElementById('view-admin').style.display = 'none';
+      document.getElementById('view-my-tickets').style.display = 'none';
+      document.getElementById('view-staff').style.display = 'block';
+      document.getElementById('app-title').textContent = `Módulo de Escaneo - ${staff.nombre}`;
+      mostrarUsuarioEnHeader(`Staff: ${staff.nombre}`);
+      iniciarEscaner();
+    }
+
+    // MIS BOLETAS
+    function verMisBoletas() {
+      if (!currentUser) return abrirModalAuth('login');
+      if (!socket) return;
+
+      document.getElementById('view-client').style.display = 'none';
+      document.getElementById('view-my-tickets').style.display = 'block';
+      socket.emit('GET_USER_TICKETS', { cliente: currentUser.nombre });
+    }
+
+    function volverAlMapa() {
+      document.getElementById('view-my-tickets').style.display = 'none';
+      document.getElementById('view-client').style.display = 'flex';
+    }
+
+    if (socket) {
+      socket.on('USER_TICKETS_RESPONSE', (tickets) => {
+        const container = document.getElementById('my-tickets-container');
+        if (tickets.length === 0) {
+          container.innerHTML = '<p>No has comprado boletas aún.</p>';
+          return;
+        }
+
+        let html = '<table><thead><tr><th>Código</th><th>Puestos</th><th>Fecha</th><th>Total</th><th>Estado</th></tr></thead><tbody>';
+        tickets.forEach(t => {
+          html += `<tr>
+            <td><strong>${t.codigoCompra}</strong></td>
+            <td>${t.puestos.join(', ')}</td>
+            <td>${t.fechaHora}</td>
+            <td>$${t.total.toLocaleString('es-CO')} COP</td>
+            <td><span style="color: ${t.usado ? '#ef4444' : '#22c55e'}; font-weight: bold;">${t.usado ? 'Usada' : 'Válida'}</span></td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+      });
     }
 
     function renderAdminData(sales, staffList, totalCapacity) {
@@ -580,6 +698,7 @@
     }
 
     function procesarReserva() {
+      if (!currentUser) return abrirModalAuth('login');
       let total = 0;
       misSillasSeleccionadas.forEach(id => total += parseInt(document.getElementById(id).dataset.precio));
 
@@ -610,12 +729,13 @@
     }
 
     function imprimirComprobante() {
+      const elemento = document.getElementById('ticket-content');
       html2pdf().set({
         margin: 10,
         filename: `Comprobante_${document.getElementById('lbl-codigo-compra').textContent}.pdf`,
         html2canvas: { scale: 2 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(document.getElementById('ticket-content')).save();
+      }).from(elemento).save();
     }
 
     function compartirComprobante() {
@@ -631,7 +751,10 @@
       detenerCuentaRegresiva();
     }
 
-    window.onload = inicializarMapa;
+    window.onload = () => {
+      inicializarMapa();
+      comprobarSesionGuardada();
+    };
   </script>
 </body>
 </html>
