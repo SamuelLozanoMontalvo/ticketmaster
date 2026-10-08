@@ -490,3 +490,16 @@ th {
 .scan-result.valid { background: #dcfce7; color: #166534; border: 2px solid #22c55e; }
 .scan-result.invalid { background: #fee2e2; color: #991b1b; border: 2px solid #ef4444; }
 .scan-result.used { background: #fef3c7; color: #92400e; border: 2px solid #f59e0b; }
+
+/* ===== Mis Boletas (tarjetas con QR) ===== */
+.mt-card { display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between; border: 1px solid #cbd5e1; border-radius: 12px; padding: 18px; margin-bottom: 18px; background: #fff; text-align: left; }
+.mt-info { flex: 1 1 300px; min-width: 0; }
+.mt-code { font-size: 26px; font-weight: 800; letter-spacing: 1px; color: #0f172a; margin-bottom: 8px; }
+.mt-meta { margin: 3px 0; color: #334155; font-size: 14px; }
+.mt-seats { width: 100%; margin-top: 12px; border-collapse: collapse; font-size: 13px; }
+.mt-seats th, .mt-seats td { border: 1px solid #e2e8f0; padding: 5px 8px; text-align: left; }
+.mt-seats th { background: #f1f5f9; }
+.mt-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 0 0 auto; }
+.mt-qr-code { font-weight: 700; letter-spacing: 1px; }
+.mt-qr small { color: #64748b; }
+.mt-pdf { width: auto !important; padding: 8px 14px; margin-top: 8px; }
