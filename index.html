@@ -7,7 +7,7 @@
   
   <link rel="stylesheet" href="style.css">
 
-  <!-- Librerías de UI/UX -->
+  <!-- Librerías del Sistema -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/kjua@0.9.0/dist/kjua.min.js"></script>
@@ -218,7 +218,7 @@
     </div>
   </div>
 
-  <!-- MODAL INICIAR SESIÓN / REGISTRARSE REDISEÑADO -->
+  <!-- MODAL INICIAR SESIÓN / REGISTRARSE -->
   <div id="auth-modal" class="modal-overlay" style="display: none;">
     <div class="auth-card">
       <div class="auth-tabs">
@@ -226,7 +226,6 @@
         <button id="tab-register" class="tab-btn" onclick="cambiarTab('register')">Registrarse</button>
       </div>
 
-      <!-- Formulario Login -->
       <form id="form-login" class="auth-form" onsubmit="loginNormal(event)">
         <input type="email" id="login-email" placeholder="Correo electrónico" required>
         <input type="password" id="login-password" placeholder="Contraseña" required>
@@ -244,7 +243,6 @@
         </div>
       </form>
 
-      <!-- Formulario Registro -->
       <form id="form-register" class="auth-form" style="display: none;" onsubmit="registroNormal(event)">
         <div class="form-row">
           <input type="text" id="reg-name" placeholder="Nombre" required>
@@ -310,7 +308,7 @@
         <div class="info-group"><label>Código de Compra:</label> <span id="lbl-codigo-compra" class="highlight"></span></div>
         <div class="info-group"><label>Puestos:</label> <span id="lbl-puestos-detalles"></span></div>
         <hr style="border: 0; border-top: 1px solid #f3e8c8; margin: 10px 0;">
-        <div class="info-group total"><label>Valor a Pagar:</label> <span id="lbl-valor-pagar"></span></div>
+        <div class="info-group total"><label>Valor Total:</label> <span id="lbl-valor-pagar"></span></div>
 
         <div class="qr-container">
           <div id="qrcode-box"></div>
@@ -897,6 +895,7 @@
       }
     }
 
+    // GENERACIÓN DIRECTA DE COMPROBANTE SIN PASARELAS
     function procesarReserva() {
       const activeUser = currentUser || currentAdmin;
       if (!activeUser) return abrirModalAuth('login');
