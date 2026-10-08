@@ -7,27 +7,35 @@
   
   <link rel="stylesheet" href="style.css">
 
+  <!-- Librerías de UI/UX -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/kjua@0.9.0/dist/kjua.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
+  
+  <!-- SweetAlert2 (Modales elegantes) -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- Canvas Confetti (Efectos de celebración) -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+  <!-- Lucide Icons (Iconografía moderna) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
 
   <!-- Encabezado -->
   <header>
-    <h1 id="app-title" style="cursor:pointer;" onclick="volverAlMapa()">Reserva de Boletos</h1>
+    <h1 id="app-title" style="cursor:pointer;" onclick="volverAlMapa()"><i data-lucide="ticket" style="vertical-align: middle; margin-right: 8px;"></i>Reserva de Boletos</h1>
     <div id="user-container">
       <div id="auth-buttons-group" class="nav-buttons">
-        <button class="btn-nav btn-login" onclick="abrirModalAuth('login')">Iniciar Sesión</button>
-        <button class="btn-nav btn-register" onclick="abrirModalAuth('register')">Registrarse</button>
-        <button class="btn-nav btn-portal" onclick="abrirModalPortal()">Portal Admin / Staff</button>
+        <button class="btn-nav btn-login" onclick="abrirModalAuth('login')"><i data-lucide="log-in" style="width:16px; vertical-align:middle; margin-right:4px;"></i>Iniciar Sesión</button>
+        <button class="btn-nav btn-register" onclick="abrirModalAuth('register')"><i data-lucide="user-plus" style="width:16px; vertical-align:middle; margin-right:4px;"></i>Registrarse</button>
+        <button class="btn-nav btn-portal" onclick="abrirModalPortal()"><i data-lucide="shield" style="width:16px; vertical-align:middle; margin-right:4px;"></i>Portal Admin / Staff</button>
       </div>
       <div id="user-info" style="display:none;">
         <span id="user-name"></span>
-        <button id="btn-mis-boletas" onclick="verMisBoletas()" class="btn-nav" style="background:#0284c7; color:white; margin-left:10px;">Mis Boletas</button>
-        <button onclick="cerrarSesion()" class="btn-logout">Salir</button>
+        <button id="btn-mis-boletas" onclick="verMisBoletas()" class="btn-nav" style="background:#0284c7; color:white; margin-left:10px;"><i data-lucide="qr-code" style="width:16px; vertical-align:middle; margin-right:4px;"></i>Mis Boletas</button>
+        <button onclick="cerrarSesion()" class="btn-logout"><i data-lucide="log-out" style="width:16px; vertical-align:middle;"></i> Salir</button>
       </div>
     </div>
   </header>
@@ -288,8 +296,8 @@
       </div>
 
       <div class="ticket-actions" data-html2canvas-ignore="true">
-        <button onclick="imprimirComprobante()" class="btn-print">🖨️ Guardar PDF</button>
-        <button onclick="compartirComprobante()" class="btn-share">📲 Compartir</button>
+        <button onclick="imprimirComprobante()" class="btn-print"><i data-lucide="printer" style="width:16px; vertical-align:middle;"></i> Guardar PDF</button>
+        <button onclick="compartirComprobante()" class="btn-share"><i data-lucide="share-2" style="width:16px; vertical-align:middle;"></i> Compartir</button>
         <button onclick="cerrarModal()" class="btn-close">Cerrar</button>
       </div>
     </div>
@@ -341,6 +349,7 @@
       } else {
         btnMisBoletas.style.display = 'inline-block';
       }
+      lucide.createIcons();
     }
 
     function ocultarTodasLasVistas() {
@@ -353,7 +362,8 @@
     function volverAlMapa() {
       ocultarTodasLasVistas();
       document.getElementById('view-client').style.setProperty('display', 'flex', 'important');
-      document.getElementById('app-title').textContent = 'Reserva de Boletos';
+      document.getElementById('app-title').innerHTML = '<i data-lucide="ticket" style="vertical-align: middle; margin-right: 8px;"></i>Reserva de Boletos';
+      lucide.createIcons();
     }
 
     function toggleZone(selectedZone) {
@@ -407,7 +417,7 @@
       const nombre = document.getElementById('reg-name').value;
       const apellido = document.getElementById('reg-lastname').value;
       const pass = document.getElementById('reg-password').value;
-      if (pass !== document.getElementById('reg-confirm-password').value) return alert('Las contraseñas no coinciden.');
+      if (pass !== document.getElementById('reg-confirm-password').value) return Swal.fire('Error', 'Las contraseñas no coinciden.', 'error');
       autenticarUsuario({ nombre: `${nombre} ${apellido}`, email: document.getElementById('reg-email').value });
     }
     function handleCredentialResponse(r) { const p = JSON.parse(atob(r.credential.split('.')[1])); autenticarUsuario({ nombre: p.name, email: p.email }); }
@@ -417,6 +427,7 @@
       localStorage.setItem('ticket_user', JSON.stringify(u));
       mostrarUsuarioEnHeader(currentUser.nombre, false, false);
       cerrarModalAuth();
+      Swal.fire({ icon: 'success', title: `¡Bienvenido, ${currentUser.nombre}!`, timer: 1500, showConfirmButton: false });
     }
 
     function cerrarSesion() {
@@ -432,7 +443,7 @@
 
     function loginAdmin(e) {
       e.preventDefault();
-      if (!socket) return alert("Error de conexión con el servidor.");
+      if (!socket) return Swal.fire('Error', 'Sin conexión con el servidor.', 'error');
       const creds = {
         username: document.getElementById('admin-user').value.trim(),
         password: document.getElementById('admin-pass').value.trim()
@@ -442,7 +453,7 @@
 
     function loginStaff(e) {
       e.preventDefault();
-      if (!socket) return alert("Error de conexión con el servidor.");
+      if (!socket) return Swal.fire('Error', 'Sin conexión con el servidor.', 'error');
       socket.emit('STAFF_LOGIN', {
         username: document.getElementById('staff-user').value.trim(),
         password: document.getElementById('staff-pass').value.trim()
@@ -469,8 +480,8 @@
         iniciarVistaStaff(staff);
       });
 
-      socket.on('ADMIN_AUTH_FAILED', (d) => alert(d.message));
-      socket.on('STAFF_AUTH_FAILED', (d) => alert(d.message));
+      socket.on('ADMIN_AUTH_FAILED', (d) => Swal.fire('Acceso Denegado', d.message, 'error'));
+      socket.on('STAFF_AUTH_FAILED', (d) => Swal.fire('Acceso Denegado', d.message, 'error'));
 
       socket.on('ADMIN_NEW_SALE', (sales) => {
         if (currentAdmin) socket.emit('ADMIN_LOGIN', currentAdmin);
@@ -575,9 +586,21 @@
     }
 
     function eliminarEntrada(codigoCompra) {
-      if (confirm(`¿Estás seguro de eliminar la entrada ${codigoCompra}? Esta acción liberará los puestos en el mapa.`)) {
-        if (socket) socket.emit('DELETE_TICKET', { codigoCompra });
-      }
+      Swal.fire({
+        title: '¿Eliminar entrada?',
+        text: `Esta acción liberará los puestos de la boleta ${codigoCompra}.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed && socket) {
+          socket.emit('DELETE_TICKET', { codigoCompra });
+          Swal.fire('Eliminado', 'La boleta ha sido eliminada y las sillas liberadas.', 'success');
+        }
+      });
     }
 
     function renderStaffList(staffList) {
@@ -596,9 +619,18 @@
     }
 
     function eliminarStaff(staffId) {
-      if (confirm('¿Estás seguro de eliminar este usuario Staff?')) {
-        if (socket) socket.emit('DELETE_STAFF', { staffId });
-      }
+      Swal.fire({
+        title: '¿Eliminar cuenta Staff?',
+        text: 'Este usuario no podrá volver a escanear entradas.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Sí, eliminar'
+      }).then((res) => {
+        if (res.isConfirmed && socket) {
+          socket.emit('DELETE_STAFF', { staffId });
+        }
+      });
     }
 
     function crearStaff(e) {
@@ -610,7 +642,7 @@
         username: document.getElementById('stf-username').value,
         password: document.getElementById('stf-password').value
       });
-      alert('Usuario Staff creado exitosamente.');
+      Swal.fire('¡Éxito!', 'Usuario Staff creado exitosamente.', 'success');
       e.target.reset();
     }
 
@@ -647,6 +679,10 @@
         resDiv.style.display = 'block';
         resDiv.className = 'scan-result ' + res.status.toLowerCase();
         resDiv.textContent = res.message;
+
+        if (res.status === 'VALID') {
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        }
       });
     }
 
@@ -697,7 +733,7 @@
       if (misSillasSeleccionadas.includes(seatId)) {
         socket.emit('UNLOCK_SEATS', { seatIds: [seatId] });
       } else {
-        if (misSillasSeleccionadas.length >= 5) return alert('Máximo 5 sillas individuales.');
+        if (misSillasSeleccionadas.length >= 5) return Swal.fire('Límite', 'Máximo 5 sillas individuales.', 'info');
         socket.emit('LOCK_SEATS', { seatIds: [seatId] });
       }
     }
@@ -714,7 +750,7 @@
       });
 
       if (sillasOcupadas.length > 0) {
-        return alert(`La mesa ${mesaId} no se puede comprar completa porque tiene puestos no disponibles.`);
+        return Swal.fire('No disponible', `La mesa ${mesaId} tiene puestos ya reservados o vendidos.`, 'warning');
       }
 
       socket.emit('LOCK_SEATS', { seatIds: sillasMesa });
@@ -842,7 +878,7 @@
     function procesarReserva() {
       const activeUser = currentUser || currentAdmin;
       if (!activeUser) return abrirModalAuth('login');
-      if (misSillasSeleccionadas.length === 0) return alert('Por favor selecciona al menos una silla.');
+      if (misSillasSeleccionadas.length === 0) return Swal.fire('Atención', 'Por favor selecciona al menos una silla.', 'info');
 
       let total = 0;
       misSillasSeleccionadas.forEach(id => {
@@ -873,6 +909,10 @@
       renderizarQR(codigoCompra, idPedido);
 
       if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
+
+      // Lanzar animación de Confeti
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+
       document.getElementById('ticket-modal').style.display = 'flex';
     }
 
@@ -906,6 +946,7 @@
     window.onload = () => {
       inicializarMapa();
       comprobarSesionGuardada();
+      lucide.createIcons();
     };
   </script>
 </body>
