@@ -66,7 +66,13 @@
           <span class="artist-badge">CRISS & RONNY</span>
           <span class="artist-badge">LESSING KERGUELEN</span>
         </div>
-        <div id="stage-banner-badge" class="stage-badge">Cargando etapa...</div>
+
+        <!-- Badges de Etapas con Resaltado Dinámico en Verde -->
+        <div class="stages-container">
+          <span id="badge-preventa" class="stage-badge">Preventa (Hasta 15 Oct)</span>
+          <span id="badge-etapa2" class="stage-badge">Etapa 2 (16 Oct - 30 Nov)</span>
+          <span id="badge-full" class="stage-badge">Precio Full (A partir de 1 Dic)</span>
+        </div>
       </div>
 
       <div class="stage">ESCENARIO PRINCIPAL / TARIMA DE ARTISTAS</div>
@@ -331,23 +337,22 @@
     let currentAdmin = null;
     let currentStaff = null;
     let misSillasSeleccionadas = [];
-    let tiposPuestos = {}; // Guarda si el puesto es 'ADULTO' o 'NIÑO'
+    let tiposPuestos = {};
     let countdownTimer = null;
     let html5QrcodeScanner = null;
 
-    // MATRIZ DE PRECIOS OFICIALES SEGÚN FLYER Y FECHAS
     const TABLA_PRECIOS = {
-      PREVENTA: { // Hasta 15 Oct
+      PREVENTA: {
         SAHARA: { ADULTO: 1050000, NINO: 420000 },
         OASIS:  { ADULTO: 950000,  NINO: 420000 },
         NOMAD:  { ADULTO: 850000,  NINO: 420000 }
       },
-      ETAPA2: { // 16 Oct al 30 Nov
+      ETAPA2: {
         SAHARA: { ADULTO: 1100000, NINO: 490000 },
         OASIS:  { ADULTO: 1000000, NINO: 490000 },
         NOMAD:  { ADULTO: 900000,  NINO: 490000 }
       },
-      FULL: { // A partir de 1 Dic
+      FULL: {
         SAHARA: { ADULTO: 1200000, NINO: 550000 },
         OASIS:  { ADULTO: 1100000, NINO: 550000 },
         NOMAD:  { ADULTO: 1000000, NINO: 550000 }
@@ -356,20 +361,15 @@
 
     function obtenerEtapaActual() {
       const hoy = new Date();
-      const mes = hoy.getMonth() + 1; // 1 - 12
+      const mes = hoy.getMonth() + 1;
       const dia = hoy.getDate();
 
-      // Si es antes del 16 de Octubre
       if (mes < 10 || (mes === 10 && dia <= 15)) {
-        return { clave: 'PREVENTA', nombre: 'Etapa Preventa (Hasta el 15 de Oct)' };
-      }
-      // Entre 16 Octubre y 30 de Noviembre
-      else if ((mes === 10 && dia >= 16) || mes === 11) {
-        return { clave: 'ETAPA2', nombre: 'Etapa 2 (16 Oct al 30 Nov)' };
-      }
-      // A partir del 1 de Diciembre
-      else {
-        return { clave: 'FULL', nombre: 'Precio Full (A partir del 1 de Dic)' };
+        return { clave: 'PREVENTA', badgeId: 'badge-preventa' };
+      } else if ((mes === 10 && dia >= 16) || mes === 11) {
+        return { clave: 'ETAPA2', badgeId: 'badge-etapa2' };
+      } else {
+        return { clave: 'FULL', badgeId: 'badge-full' };
       }
     }
 
@@ -746,8 +746,18 @@
     }
 
     function inicializarMapa() {
+      // Activar visualmente solo el badge de la etapa actual en VERDE
       const etapaInfo = obtenerEtapaActual();
-      document.getElementById('stage-banner-badge').textContent = etapaInfo.nombre;
+      ['badge-preventa', 'badge-etapa2', 'badge-full'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          if (id === etapaInfo.badgeId) {
+            el.classList.add('active');
+          } else {
+            el.classList.remove('active');
+          }
+        }
+      });
 
       Object.keys(CONFIG).forEach(key => {
         const conf = CONFIG[key];
@@ -853,7 +863,7 @@
           actualizarEstadoUI(id, 'locked', esMio);
           if (esMio && !misSillasSeleccionadas.includes(id)) {
             misSillasSeleccionadas.push(id);
-            if (!tiposPuestos[id]) tiposPuestos[id] = 'ADULTO'; // Por defecto Adulto
+            if (!tiposPuestos[id]) tiposPuestos[id] = 'ADULTO';
           }
         });
         if (esMio) { iniciarCuentaRegresiva(expiresAt); actualizarResumen(); }
@@ -1017,7 +1027,7 @@
       }
     }
 
-    function compartirComprobante() {
+    function compartiComprobante() {
       const codigo = document.getElementById('lbl-codigo-compra').textContent;
       if (navigator.share) navigator.share({ title: 'Comprobante San Silvestre 2026', text: `Código: ${codigo}`, url: window.location.href });
       else alert(`Código de compra: ${codigo}`);
