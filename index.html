@@ -1036,12 +1036,10 @@
     }
 
     window.onload = () => {
-      // 1. Construir las mesas y la UI del DOM
       inicializarMapa();
       comprobarSesionGuardada();
       lucide.createIcons();
 
-      // 2. Pedir estado del mapa inmediatamente para pintar sillas rojas de inmediato
       if (socket) {
         socket.emit('GET_MAP_STATE');
       }
