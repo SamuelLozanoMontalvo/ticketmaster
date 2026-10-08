@@ -623,3 +623,33 @@ th { background: #fdfbf7; color: #111827; font-weight: 800; }
   .auth-card, .ticket-card { padding: 20px 16px; }
   .ticket-actions { flex-direction: column; }
 }
+
+/* Badges de Etapas de Venta */
+.stages-container {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.stage-badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.1);
+  color: #9ca3af;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.3s ease;
+}
+
+/* Etapa Activa Resaltada en Verde Neón */
+.stage-badge.active {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #22c55e !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+  transform: scale(1.05);
+}
