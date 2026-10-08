@@ -15,7 +15,7 @@ body {
 
 /* Header Oficial Hotel Cartagena Plaza */
 header {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(12px);
   border-bottom: 2px solid #d4af37;
   padding: 1rem 2rem;
@@ -41,13 +41,15 @@ header h1 span {
   font-style: italic;
 }
 
+/* Botones de Navegación Visualmente Destacados */
 .nav-buttons {
-  display: flex;
+  display: flex !important;
   gap: 12px;
+  align-items: center;
 }
 
 .btn-nav {
-  padding: 8px 18px;
+  padding: 10px 18px;
   border-radius: 8px;
   border: none;
   font-weight: 700;
@@ -56,11 +58,14 @@ header h1 span {
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .btn-login { 
   background: linear-gradient(135deg, #d4af37 0%, #aa7c11 100%); 
-  color: white; 
+  color: #ffffff; 
   box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3); 
 }
 .btn-login:hover { transform: translateY(-1px); background: linear-gradient(135deg, #e5be38 0%, #bd8d13 100%); }
@@ -70,26 +75,29 @@ header h1 span {
   color: #f3e8c8; 
   border: 1px solid #d4af37;
 }
-.btn-register:hover { background: #1f2937; }
+.btn-register:hover { background: #1f2937; transform: translateY(-1px); }
 
 .btn-portal { 
-  background: rgba(0, 0, 0, 0.05); 
+  background: #fdfbf7; 
   color: #4b5563; 
   border: 1px solid #cbd5e1; 
 }
-.btn-portal:hover { background: rgba(0, 0, 0, 0.1); color: #111827; }
+.btn-portal:hover { background: #f3f4f6; color: #111827; }
 
 .btn-logout {
   background: #ef4444;
   color: white;
   border: none;
-  padding: 6px 14px;
+  padding: 8px 16px;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-/* Banner superior informativo */
+/* Banner Informativo Superior */
 .event-banner-card {
   background: #000000;
   color: white;
@@ -307,7 +315,7 @@ header h1 span {
   justify-items: center;
 }
 
-/* TARJETAS DE MESA EN NEGRO Y DORADO */
+/* Tarjetas de Mesa Redonda */
 .table-card {
   width: 120px;
   height: 120px;
@@ -372,11 +380,152 @@ header h1 span {
 
 .seat.sold { background: #ef4444 !important; cursor: not-allowed !important; opacity: 0.85; pointer-events: none !important; }
 
-/* Modales y Comprobantes */
+/* MODALES Y FORMULARIOS DE AUTENTICACIÓN REDISEÑADOS */
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
   display: flex;
-  align-items:
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.auth-card, .ticket-card {
+  background: #ffffff;
+  border: 2px solid #d4af37;
+  color: #1a1a1a;
+  padding: 32px;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 440px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.35);
+}
+
+.auth-tabs {
+  display: flex;
+  margin-bottom: 24px;
+  border-bottom: 2px solid #f3e8c8;
+}
+
+.tab-btn {
+  flex: 1; 
+  padding: 12px; 
+  background: none; 
+  border: none; 
+  font-weight: 800; 
+  color: #9ca3af; 
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.tab-btn.active { 
+  color: #aa7c11; 
+  border-bottom: 3px solid #d4af37; 
+}
+
+.auth-form { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 16px; 
+}
+
+.auth-form input {
+  padding: 12px 16px;
+  background: #fdfbf7;
+  color: #111827;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: #d4af37;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+}
+
+.btn-submit {
+  padding: 14px;
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+  color: #f3e8c8;
+  border: 1px solid #d4af37;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-submit:hover {
+  background: linear-gradient(135deg, #d4af37 0%, #aa7c11 100%);
+  color: #000;
+}
+
+/* Divisor y Botón Google Estilizado */
+.social-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 600;
+  margin: 10px 0;
+}
+
+.social-divider::before,
+.social-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.social-divider::before { margin-right: 12px; }
+.social-divider::after { margin-left: 12px; }
+
+.google-btn-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* Comprobantes y Paneles Admin */
+.ticket-header { text-align: center; margin-bottom: 16px; }
+.ticket-header h2 { font-family: 'Playfair Display', serif; color: #000; font-size: 1.6rem; }
+
+.ticket-body .info-group { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.9rem; color: #374151; }
+.ticket-body .highlight { font-weight: 800; color: #aa7c11; }
+
+.qr-container {
+  display: flex; justify-content: center; align-items: center;
+  background: #fdfbf7; padding: 12px; border: 1px solid #d4af37; border-radius: 12px; margin: 16px 0;
+}
+
+.ticket-actions { display: flex; gap: 10px; margin-top: 20px; }
+.btn-print { flex: 1; padding: 10px; background: #16a34a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; }
+.btn-share { flex: 1; padding: 10px; background: #0284c7; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; }
+.btn-close { flex: 1; padding: 10px; background: #64748b; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; }
+
+.scan-container {
+  background: #ffffff; padding: 24px; border-radius: 16px; text-align: center; border: 2px solid #d4af37;
+}
+
+.scan-result { margin-top: 15px; padding: 15px; border-radius: 10px; font-weight: 700; white-space: pre-line; }
+.scan-result.valid { background: #dcfce7; color: #166534; }
+.scan-result.used { background: #fef3c7; color: #92400e; }
+.scan-result.invalid { background: #fee2e2; color: #991b1b; }
+
+.stats-grid { display: grid; gap: 16px; margin-bottom: 24px; }
+.stat-card { background: #ffffff; padding: 18px; border-radius: 12px; border: 1px solid #e2d5c3; text-align: center; }
+.stat-card .value { font-size: 1.5rem; font-weight: 800; margin-top: 6px; color: #aa7c11; }
+.admin-sections { display: flex; gap: 24px; }
+.admin-box { background: #ffffff; padding: 24px; border-radius: 16px; border: 1px solid #e2d5c3; color: #111827; }
+table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+th, td { padding: 12px; border-bottom: 1px solid #f3f4f6; text-align: left; font-size: 0.85rem; color: #374151; }
+th { background: #fdfbf7; color: #111827; font-weight: 800; }
