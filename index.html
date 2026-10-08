@@ -26,6 +26,7 @@
       </div>
       <div id="user-info" style="display:none;">
         <span id="user-name"></span>
+        <button id="btn-panel-admin" onclick="irAPanelAdmin()" class="btn-nav" style="display:none; background:#2563eb; color:white; margin-left:10px;">Panel Admin</button>
         <button id="btn-mis-boletas" onclick="verMisBoletas()" class="btn-nav" style="background:#0284c7; color:white; margin-left:10px;">Mis Boletas</button>
         <button onclick="cerrarSesion()" class="btn-logout">Salir</button>
       </div>
@@ -315,10 +316,14 @@
       const adminSaved = localStorage.getItem('ticket_admin');
       const staffSaved = localStorage.getItem('ticket_staff');
 
-      if (adminSaved) {
-        currentAdmin = JSON.parse(adminSaved);
+      let adminParsed = null;
+      try { adminParsed = adminSaved ? JSON.parse(adminSaved) : null; } catch (e) {}
+      if (adminParsed && !adminParsed.token) { localStorage.removeItem('ticket_admin'); adminParsed = null; }
+
+      if (adminParsed) {
+        currentAdmin = adminParsed;
         mostrarUsuarioEnHeader(`Admin (${currentAdmin.username})`, true, false);
-        if (socket) socket.emit('ADMIN_LOGIN', currentAdmin);
+        reanudarSesionAdmin();
       } else if (staffSaved) {
         currentStaff = JSON.parse(staffSaved);
         iniciarVistaStaff(currentStaff);
@@ -339,6 +344,7 @@
       } else {
         btnMisBoletas.style.display = 'inline-block';
       }
+      document.getElementById('btn-panel-admin').style.display = esAdmin ? 'inline-block' : 'none';
     }
 
     function ocultarTodasLasVistas() {
@@ -418,6 +424,8 @@
     }
 
     function cerrarSesion() {
+      if (currentAdmin && socket) socket.emit('ADMIN_LOGOUT', { token: currentAdmin.token });
+      document.getElementById('btn-panel-admin').style.display = 'none';
       currentUser = null; currentAdmin = null; currentStaff = null;
       localStorage.removeItem('ticket_user');
       localStorage.removeItem('ticket_admin');
@@ -450,14 +458,36 @@
     if (socket) {
       socket.on('ADMIN_AUTH_SUCCESS', (data) => {
         cerrarModalPortal();
-        currentAdmin = { username: data.username, password: document.getElementById('admin-pass').value || currentAdmin?.password };
+        currentAdmin = { username: data.username, token: data.token };
         localStorage.setItem('ticket_admin', JSON.stringify(currentAdmin));
-        
-        ocultarTodasLasVistas();
-        document.getElementById('view-admin').style.setProperty('display', 'block', 'important');
-        document.getElementById('app-title').textContent = 'Panel de Administración';
         mostrarUsuarioEnHeader(`Admin (${data.username})`, true, false);
+        lastAdminData = data;
+        irAPanelAdmin();
+      });
+
+      // Sesión reanudada (recarga o reconexión): solo refresca datos, NO cambia de vista
+      socket.on('ADMIN_RESUMED', (data) => {
+        lastAdminData = data;
+        mostrarUsuarioEnHeader(`Admin (${data.username})`, true, false);
+        if (document.getElementById('view-admin').style.display === 'block') {
+          renderAdminData(data.sales, data.staffList, data.totalCapacity);
+        }
+      });
+
+      socket.on('ADMIN_DATA', (data) => {
+        lastAdminData = data;
         renderAdminData(data.sales, data.staffList, data.totalCapacity);
+      });
+
+      socket.on('ADMIN_SESSION_INVALID', () => {
+        if (!currentAdmin) return;
+        localStorage.removeItem('ticket_admin');
+        currentAdmin = null;
+        document.getElementById('btn-panel-admin').style.display = 'none';
+        document.getElementById('auth-buttons-group').setAttribute('style', 'display: flex !important');
+        document.getElementById('user-info').setAttribute('style', 'display: none !important');
+        volverAlMapa();
+        alert('Tu sesión de administrador expiró. Inicia sesión de nuevo en "Portal Admin / Staff".');
       });
 
       socket.on('STAFF_AUTH_SUCCESS', (staff) => {
@@ -469,10 +499,20 @@
 
       socket.on('ADMIN_AUTH_FAILED', (d) => alert(d.message));
       socket.on('STAFF_AUTH_FAILED', (d) => alert(d.message));
+    }
 
-      socket.on('ADMIN_NEW_SALE', (sales) => {
-        if (currentAdmin) socket.emit('ADMIN_LOGIN', currentAdmin);
-      });
+    let lastAdminData = null;
+
+    function irAPanelAdmin() {
+      if (!currentAdmin) return abrirModalPortal();
+      ocultarTodasLasVistas();
+      document.getElementById('view-admin').style.setProperty('display', 'block', 'important');
+      document.getElementById('app-title').textContent = 'Panel de Administración';
+      if (lastAdminData) renderAdminData(lastAdminData.sales, lastAdminData.staffList, lastAdminData.totalCapacity);
+    }
+
+    function reanudarSesionAdmin() {
+      if (socket && currentAdmin && currentAdmin.token) socket.emit('ADMIN_RESUME', { token: currentAdmin.token });
     }
 
     function iniciarVistaStaff(staff) {
@@ -692,7 +732,28 @@
     }
 
     if (socket) {
-      socket.on('MAP_STATE', (state) => Object.keys(state).forEach(id => actualizarEstadoUI(id, state[id].status, state[id].userId === socket.id)));
+      socket.on('MAP_STATE', (state) => {
+        lastMapState = state;
+        aplicarMapState();
+      });
+
+      // Se dispara al conectar Y en cada reconexión: reanuda admin y pide el mapa actual
+      socket.on('connect', () => {
+        reanudarSesionAdmin();
+        socket.emit('GET_MAP_STATE');
+      });
+
+      socket.on('PURCHASE_OK', () => {
+        if (pendingPurchase) mostrarComprobante(pendingPurchase);
+        pendingPurchase = null;
+      });
+
+      socket.on('PURCHASE_FAILED', ({ message }) => {
+        pendingPurchase = null;
+        alert(message);
+      });
+
+      socket.on('LOCK_FAILED', ({ message }) => alert(message));
       socket.on('SEATS_LOCKED', ({ seatIds, userId, expiresAt }) => {
         const esMio = userId === socket.id;
         seatIds.forEach(id => {
@@ -712,6 +773,24 @@
       });
 
       socket.on('SEATS_SOLD', ({ seatIds }) => seatIds.forEach(id => actualizarEstadoUI(id, 'sold', false)));
+    }
+
+    let lastMapState = {};
+    let pendingPurchase = null;
+
+    // Pinta TODAS las sillas según el estado del servidor (las que no estén en el estado = disponibles)
+    function aplicarMapState() {
+      const mias = [];
+      document.querySelectorAll('.seat').forEach(el => {
+        const st = lastMapState[el.id];
+        if (!st) { el.className = 'seat available'; return; }
+        const esMio = st.status === 'locked' && st.userId === socket.id;
+        if (esMio) mias.push(el.id);
+        actualizarEstadoUI(el.id, st.status, esMio);
+      });
+      misSillasSeleccionadas = mias;
+      actualizarResumen();
+      if (mias.length === 0) detenerCuentaRegresiva();
     }
 
     function actualizarEstadoUI(seatId, status, esMio) {
@@ -778,16 +857,23 @@
         idPedido,
         codigoCompra,
         cliente: currentAdmin ? `RESERVA ADMIN (${currentAdmin.username})` : activeUser.nombre,
-        seatIds: misSillasSeleccionadas,
+        seatIds: [...misSillasSeleccionadas],
         total,
         fechaHora
       };
 
+      pendingPurchase = datosCompra;
+      if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
+    }
+
+    function mostrarComprobante(datosCompra) {
+      const { idPedido, codigoCompra, total, fechaHora } = datosCompra;
+      const sillas = datosCompra.seatIds;
       document.getElementById('lbl-id-pedido').textContent = `#${idPedido}`;
       document.getElementById('lbl-nombre-cliente').textContent = datosCompra.cliente;
       document.getElementById('lbl-fecha-hora').textContent = fechaHora;
       document.getElementById('lbl-codigo-compra').textContent = codigoCompra;
-      document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
+      document.getElementById('lbl-puestos-detalles').textContent = sillas.join(', ');
       document.getElementById('lbl-valor-pagar').textContent = `$${total.toLocaleString('es-CO')} COP`;
 
       setTimeout(() => {
@@ -797,7 +883,6 @@
         }
       }, 100);
 
-      if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
       document.getElementById('ticket-modal').style.display = 'flex';
     }
 
@@ -824,10 +909,13 @@
       detenerCuentaRegresiva();
     }
 
-    window.onload = () => {
+    function arrancarApp() {
       inicializarMapa();
+      aplicarMapState();
       comprobarSesionGuardada();
-    };
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancarApp);
+    else arrancarApp();
   </script>
 </body>
 </html>
