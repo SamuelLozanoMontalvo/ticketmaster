@@ -44,7 +44,7 @@ header h1 span {
   font-style: italic;
 }
 
-/* Botones de Navegación */
+/* Botones de Navegación Header */
 .nav-buttons {
   display: flex !important;
   gap: 10px;
@@ -131,18 +131,37 @@ header h1 span {
   margin: 8px 4px 0 4px;
 }
 
-.stage-badge {
-  display: inline-block;
-  background: #16a34a;
-  color: #fff;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  margin-top: 6px;
+/* Contenedor y Badges de Etapas de Venta */
+.stages-container {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
 }
 
-/* Main Layout */
+.stage-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.1);
+  color: #9ca3af;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.3s ease;
+}
+
+/* Etapa Activa Resaltada en Verde Neón */
+.stage-badge.active {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #22c55e !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+  transform: scale(1.05);
+}
+
+/* Layout Principal */
 .main-layout {
   display: flex;
   gap: 24px;
@@ -187,7 +206,7 @@ header h1 span {
 #selected-list {
   list-style: none;
   margin-bottom: 15px;
-  max-height: 200px;
+  max-height: 220px;
   overflow-y: auto;
 }
 
@@ -203,12 +222,19 @@ header h1 span {
 }
 
 .type-select {
-  padding: 2px 6px;
+  padding: 4px 8px;
   border-radius: 6px;
   border: 1px solid #d1d5db;
   font-size: 0.75rem;
   font-weight: 700;
   background: #fdfbf7;
+  color: #111827;
+  cursor: pointer;
+}
+
+.type-select:focus {
+  outline: none;
+  border-color: #d4af37;
 }
 
 .total-box {
@@ -304,7 +330,7 @@ header h1 span {
 .dot.locked { background: #f59e0b; }
 .dot.sold { background: #ef4444; }
 
-/* Acordeones con Colores Oficiales del Post */
+/* Acordeones con Colores Oficiales de Zonas */
 .zone-accordion {
   margin-bottom: 16px;
   border-radius: 12px;
@@ -591,6 +617,7 @@ table { width: 100%; border-collapse: collapse; margin-top: 14px; min-width: 500
 th, td { padding: 10px; border-bottom: 1px solid #f3f4f6; text-align: left; font-size: 0.8rem; color: #374151; }
 th { background: #fdfbf7; color: #111827; font-weight: 800; }
 
+/* Adaptabilidad a Pantallas Pequeñas */
 @media screen and (max-width: 992px) {
   .main-layout {
     flex-direction: column-reverse;
@@ -622,34 +649,4 @@ th { background: #fdfbf7; color: #111827; font-weight: 800; }
   .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .auth-card, .ticket-card { padding: 20px 16px; }
   .ticket-actions { flex-direction: column; }
-}
-
-/* Badges de Etapas de Venta */
-.stages-container {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-.stage-badge {
-  display: inline-block;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.1);
-  color: #9ca3af;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  transition: all 0.3s ease;
-}
-
-/* Etapa Activa Resaltada en Verde Neón */
-.stage-badge.active {
-  background: #16a34a !important;
-  color: #ffffff !important;
-  border-color: #22c55e !important;
-  box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
-  transform: scale(1.05);
 }
