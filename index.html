@@ -7,7 +7,6 @@
   
   <link rel="stylesheet" href="style.css">
 
-  <!-- Carga de Librerías Vía CDN -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
@@ -110,13 +109,14 @@
       <button onclick="volverAlMapa()" class="btn-submit" style="width: auto; padding: 8px 16px; background: #64748b;">Volver al Mapa</button>
     </div>
 
-    <div class="stats-grid">
+    <!-- Estadísticas Actualizadas -->
+    <div class="stats-grid" style="grid-template-columns: repeat(5, 1fr);">
       <div class="stat-card">
         <h4>Sillas Vendidas</h4>
         <div class="value" id="stat-sillas-vendidas">0 / 600</div>
       </div>
       <div class="stat-card">
-        <h4>Porcentaje de Ocupación</h4>
+        <h4>Ocupación</h4>
         <div class="value" id="stat-porcentaje">0%</div>
       </div>
       <div class="stat-card">
@@ -124,8 +124,12 @@
         <div class="value" id="stat-total-ingresado">$0 COP</div>
       </div>
       <div class="stat-card">
-        <h4>Total de Pedidos</h4>
-        <div class="value" id="stat-pedidos">0</div>
+        <h4>Boletas Pendientes</h4>
+        <div class="value" id="stat-pendientes" style="color: #d97706;">0</div>
+      </div>
+      <div class="stat-card">
+        <h4>Boletas Ingresadas</h4>
+        <div class="value" id="stat-ingresadas" style="color: #16a34a;">0</div>
       </div>
     </div>
 
@@ -140,7 +144,8 @@
               <th>Entradas</th>
               <th>Puestos / Zona</th>
               <th>Fecha / Hora</th>
-              <th>Estado Acceso</th>
+              <th>Estado</th>
+              <th>Acción</th>
             </tr>
           </thead>
           <tbody id="admin-sales-table"></tbody>
@@ -164,6 +169,7 @@
               <th>ID Staff</th>
               <th>Nombre</th>
               <th>Username</th>
+              <th>Acción</th>
             </tr>
           </thead>
           <tbody id="admin-staff-table"></tbody>
@@ -192,7 +198,7 @@
     </div>
   </div>
 
-  <!-- Modal Autenticación Cliente -->
+  <!-- Modales -->
   <div id="auth-modal" class="modal-overlay" style="display: none;">
     <div class="auth-card">
       <div class="auth-tabs">
@@ -234,7 +240,6 @@
     </div>
   </div>
 
-  <!-- Modal Portal Admin / Staff -->
   <div id="portal-modal" class="modal-overlay" style="display: none;">
     <div class="auth-card">
       <div class="auth-tabs">
@@ -260,7 +265,6 @@
     </div>
   </div>
 
-  <!-- Modal Comprobante -->
   <div id="ticket-modal" class="modal-overlay" style="display: none;">
     <div class="ticket-card" id="ticket-content">
       <div class="ticket-header">
@@ -294,6 +298,7 @@
     const socket = typeof io !== 'undefined' ? io('https://ticketmaster-production.up.railway.app') : null;
     
     let currentUser = null;
+    let currentAdmin = null;
     let currentStaff = null;
     let misSillasSeleccionadas = [];
     let countdownTimer = null;
@@ -308,21 +313,27 @@
 
     function comprobarSesionGuardada() {
       const userSaved = localStorage.getItem('ticket_user');
+      const adminSaved = localStorage.getItem('ticket_admin');
       const staffSaved = localStorage.getItem('ticket_staff');
 
-      if (userSaved) {
-        currentUser = JSON.parse(userSaved);
-        mostrarUsuarioEnHeader(currentUser.nombre);
+      if (adminSaved) {
+        currentAdmin = JSON.parse(adminSaved);
+        mostrarUsuarioEnHeader(`Admin (${currentAdmin.username})`, true);
+        if (socket) socket.emit('ADMIN_LOGIN', currentAdmin);
       } else if (staffSaved) {
         currentStaff = JSON.parse(staffSaved);
         iniciarVistaStaff(currentStaff);
+      } else if (userSaved) {
+        currentUser = JSON.parse(userSaved);
+        mostrarUsuarioEnHeader(currentUser.nombre, false);
       }
     }
 
-    function mostrarUsuarioEnHeader(nombre) {
+    function mostrarUsuarioEnHeader(nombre, esAdmin = false) {
       document.getElementById('auth-buttons-group').setAttribute('style', 'display: none !important');
       document.getElementById('user-info').setAttribute('style', 'display: block !important');
       document.getElementById('user-name').textContent = `Hola, ${nombre}`;
+      document.getElementById('btn-mis-boletas').style.display = esAdmin ? 'none' : 'inline-block';
     }
 
     function ocultarTodasLasVistas() {
@@ -397,13 +408,14 @@
     function autenticarUsuario(u) {
       currentUser = u;
       localStorage.setItem('ticket_user', JSON.stringify(u));
-      mostrarUsuarioEnHeader(currentUser.nombre);
+      mostrarUsuarioEnHeader(currentUser.nombre, false);
       cerrarModalAuth();
     }
 
     function cerrarSesion() {
-      currentUser = null; currentStaff = null;
+      currentUser = null; currentAdmin = null; currentStaff = null;
       localStorage.removeItem('ticket_user');
+      localStorage.removeItem('ticket_admin');
       localStorage.removeItem('ticket_staff');
       document.getElementById('auth-buttons-group').setAttribute('style', 'display: flex !important');
       document.getElementById('user-info').setAttribute('style', 'display: none !important');
@@ -414,10 +426,11 @@
     function loginAdmin(e) {
       e.preventDefault();
       if (!socket) return alert("Error de conexión con el servidor.");
-      socket.emit('ADMIN_LOGIN', {
+      const creds = {
         username: document.getElementById('admin-user').value,
         password: document.getElementById('admin-pass').value
-      });
+      };
+      socket.emit('ADMIN_LOGIN', creds);
     }
 
     function loginStaff(e) {
@@ -432,10 +445,13 @@
     if (socket) {
       socket.on('ADMIN_AUTH_SUCCESS', (data) => {
         cerrarModalPortal();
+        currentAdmin = { username: data.username, password: document.getElementById('admin-pass').value || currentAdmin?.password };
+        localStorage.setItem('ticket_admin', JSON.stringify(currentAdmin));
+        
         ocultarTodasLasVistas();
         document.getElementById('view-admin').style.setProperty('display', 'block', 'important');
         document.getElementById('app-title').textContent = 'Panel de Administración';
-        mostrarUsuarioEnHeader('Administrador');
+        mostrarUsuarioEnHeader(`Admin (${data.username})`, true);
         renderAdminData(data.sales, data.staffList, data.totalCapacity);
       });
 
@@ -448,17 +464,19 @@
 
       socket.on('ADMIN_AUTH_FAILED', (d) => alert(d.message));
       socket.on('STAFF_AUTH_FAILED', (d) => alert(d.message));
+      socket.on('ADMIN_NEW_SALE', (sales) => {
+        if (currentAdmin) socket.emit('ADMIN_LOGIN', currentAdmin);
+      });
     }
 
     function iniciarVistaStaff(staff) {
       ocultarTodasLasVistas();
       document.getElementById('view-staff').style.setProperty('display', 'block', 'important');
       document.getElementById('app-title').textContent = `Módulo Escáner - ${staff.nombre}`;
-      mostrarUsuarioEnHeader(`Staff: ${staff.nombre}`);
+      mostrarUsuarioEnHeader(`Staff: ${staff.nombre}`, false);
       iniciarEscaner();
     }
 
-    // VISTA "MIS BOLETAS"
     function verMisBoletas() {
       if (!currentUser) return abrirModalAuth('login');
       if (!socket) return;
@@ -498,12 +516,18 @@
 
     function renderAdminData(sales, staffList, totalCapacity) {
       let totalSillas = 0; let totalIngresado = 0;
+      let pendientesCount = 0; let ingresadasCount = 0;
+
       const salesTbody = document.getElementById('admin-sales-table');
       salesTbody.innerHTML = '';
 
       sales.forEach(s => {
         totalSillas += s.numEntradas;
         totalIngresado += s.total;
+
+        if (s.usado) ingresadasCount += s.numEntradas;
+        else pendientesCount += s.numEntradas;
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td><strong>${s.codigoCompra}</strong></td>
@@ -512,6 +536,7 @@
           <td>${s.puestos.join(', ')}</td>
           <td>${s.fechaHora}</td>
           <td><span style="color: ${s.usado ? '#16a34a' : '#d97706'}; font-weight: bold;">${s.usado ? 'Ingresado' : 'Pendiente'}</span></td>
+          <td><button onclick="eliminarEntrada('${s.codigoCompra}')" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px;">Eliminar</button></td>
         `;
         salesTbody.appendChild(tr);
       });
@@ -519,9 +544,16 @@
       document.getElementById('stat-sillas-vendidas').textContent = `${totalSillas} / ${totalCapacity}`;
       document.getElementById('stat-porcentaje').textContent = `${((totalSillas / totalCapacity) * 100).toFixed(1)}%`;
       document.getElementById('stat-total-ingresado').textContent = `$${totalIngresado.toLocaleString('es-CO')} COP`;
-      document.getElementById('stat-pedidos').textContent = sales.length;
+      document.getElementById('stat-pendientes').textContent = pendientesCount;
+      document.getElementById('stat-ingresadas').textContent = ingresadasCount;
 
       renderStaffList(staffList);
+    }
+
+    function eliminarEntrada(codigoCompra) {
+      if (confirm(`¿Estás seguro de eliminar la entrada ${codigoCompra}? Esta acción liberará los puestos en el mapa.`)) {
+        if (socket) socket.emit('DELETE_TICKET', { codigoCompra });
+      }
     }
 
     function renderStaffList(staffList) {
@@ -529,9 +561,20 @@
       staffTbody.innerHTML = '';
       staffList.forEach(stf => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${stf.id}</td><td>${stf.nombre} ${stf.apellido}</td><td>${stf.username}</td>`;
+        tr.innerHTML = `
+          <td>${stf.id}</td>
+          <td>${stf.nombre} ${stf.apellido}</td>
+          <td>${stf.username}</td>
+          <td><button onclick="eliminarStaff('${stf.id}')" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px;">Eliminar</button></td>
+        `;
         staffTbody.appendChild(tr);
       });
+    }
+
+    function eliminarStaff(staffId) {
+      if (confirm('¿Estás seguro de eliminar este usuario Staff?')) {
+        if (socket) socket.emit('DELETE_STAFF', { staffId });
+      }
     }
 
     function crearStaff(e) {
@@ -549,7 +592,6 @@
 
     if (socket) {
       socket.on('STAFF_LIST_UPDATED', (list) => renderStaffList(list));
-      socket.on('ADMIN_NEW_SALE', () => socket.emit('ADMIN_LOGIN', { username: 'admin', password: 'admin123password' }));
     }
 
     function iniciarEscaner() {
@@ -585,193 +627,4 @@
     }
 
     function inicializarMapa() {
-      Object.keys(CONFIG).forEach(key => {
-        const conf = CONFIG[key];
-        const container = document.getElementById(`zone-${key.toLowerCase()}`);
-        if (!container) return;
-        container.innerHTML = '';
-        for (let charCode = conf.start.charCodeAt(0); charCode <= conf.end.charCodeAt(0); charCode++) {
-          const letra = String.fromCharCode(charCode);
-          for (let i = 1; i <= 5; i++) {
-            container.appendChild(crearElementoMesa(`${letra}${i}`, conf.zoneName));
-          }
-        }
-      });
-    }
-
-    function crearElementoMesa(mesaId, zona) {
-      const mesaCard = document.createElement('div');
-      mesaCard.className = 'table-card';
-      mesaCard.id = `table-${mesaId}`;
-
-      const mesaLabel = document.createElement('div');
-      mesaLabel.className = 'table-label';
-      mesaLabel.innerHTML = `<strong>${mesaId}</strong><button class="btn-buy-table" onclick="comprarMesaCompleta('${mesaId}')">Toda la Mesa</button>`;
-      mesaCard.appendChild(mesaLabel);
-
-      for (let s = 1; s <= 10; s++) {
-        const seatId = `${mesaId}-S${s}`;
-        const seat = document.createElement('div');
-        seat.className = 'seat available';
-        seat.id = seatId;
-        seat.dataset.precio = PRECIOS[zona];
-
-        const angle = (s - 1) * 36 * (Math.PI / 180);
-        seat.style.left = `${45 + 42 * Math.cos(angle) - 8}px`;
-        seat.style.top = `${45 + 42 * Math.sin(angle) - 8}px`;
-        seat.onclick = (e) => { e.stopPropagation(); toggleSilla(seatId); };
-        mesaCard.appendChild(seat);
-      }
-      return mesaCard;
-    }
-
-    function toggleSilla(seatId) {
-      if (!currentUser) return abrirModalAuth('login');
-      if (!socket) return;
-      if (misSillasSeleccionadas.includes(seatId)) {
-        socket.emit('UNLOCK_SEATS', { seatIds: [seatId] });
-      } else {
-        if (misSillasSeleccionadas.length >= 5) return alert('Máximo 5 sillas individuales.');
-        socket.emit('LOCK_SEATS', { seatIds: [seatId] });
-      }
-    }
-
-    function comprarMesaCompleta(mesaId) {
-      if (!currentUser) return abrirModalAuth('login');
-      if (!socket) return;
-      const sillasMesa = Array.from({ length: 10 }, (_, i) => `${mesaId}-S${i + 1}`);
-      socket.emit('LOCK_SEATS', { seatIds: sillasMesa });
-    }
-
-    if (socket) {
-      socket.on('MAP_STATE', (state) => Object.keys(state).forEach(id => actualizarEstadoUI(id, state[id].status, state[id].userId === socket.id)));
-      socket.on('SEATS_LOCKED', ({ seatIds, userId, expiresAt }) => {
-        const esMio = userId === socket.id;
-        seatIds.forEach(id => {
-          actualizarEstadoUI(id, 'locked', esMio);
-          if (esMio && !misSillasSeleccionadas.includes(id)) misSillasSeleccionadas.push(id);
-        });
-        if (esMio) { iniciarCuentaRegresiva(expiresAt); actualizarResumen(); }
-      });
-
-      socket.on('SEATS_RELEASED', ({ seatIds }) => {
-        seatIds.forEach(id => {
-          actualizarEstadoUI(id, 'available', false);
-          misSillasSeleccionadas = misSillasSeleccionadas.filter(item => item !== id);
-        });
-        actualizarResumen();
-        if (misSillasSeleccionadas.length === 0) detenerCuentaRegresiva();
-      });
-
-      socket.on('SEATS_SOLD', ({ seatIds }) => seatIds.forEach(id => actualizarEstadoUI(id, 'sold', false)));
-    }
-
-    function actualizarEstadoUI(seatId, status, esMio) {
-      const el = document.getElementById(seatId);
-      if (!el) return;
-      el.className = 'seat ' + (status === 'sold' ? 'sold' : status === 'locked' ? (esMio ? 'my-selection' : 'locked') : 'available');
-    }
-
-    function actualizarResumen() {
-      const listEl = document.getElementById('selected-list');
-      const totalEl = document.getElementById('total-price');
-      const btn = document.getElementById('btn-checkout');
-      listEl.innerHTML = ''; let total = 0;
-
-      if (misSillasSeleccionadas.length === 0) {
-        listEl.innerHTML = '<li>No has seleccionado ningún puesto.</li>';
-        btn.disabled = true;
-      } else {
-        misSillasSeleccionadas.forEach(id => {
-          const precio = parseInt(document.getElementById(id).dataset.precio);
-          total += precio;
-          const li = document.createElement('li');
-          li.textContent = `${id} - $${precio.toLocaleString('es-CO')} COP`;
-          listEl.appendChild(li);
-        });
-        btn.disabled = false;
-      }
-      totalEl.textContent = `$${total.toLocaleString('es-CO')} COP`;
-    }
-
-    function iniciarCuentaRegresiva(expiresAt) {
-      detenerCuentaRegresiva();
-      countdownTimer = setInterval(() => {
-        const diff = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
-        document.getElementById('timer-display').textContent = `Tiempo restante: ${String(Math.floor(diff / 60)).padStart(2, '0')}:${String(diff % 60).padStart(2, '0')}`;
-        if (diff <= 0) detenerCuentaRegresiva();
-      }, 1000);
-    }
-
-    function detenerCuentaRegresiva() {
-      if (countdownTimer) clearInterval(countdownTimer);
-      document.getElementById('timer-display').textContent = 'Tiempo restante: --:--';
-    }
-
-    // GENERAR COMPROBANTE
-    function procesarReserva() {
-      if (!currentUser) return abrirModalAuth('login');
-      let total = 0;
-      misSillasSeleccionadas.forEach(id => total += parseInt(document.getElementById(id).dataset.precio));
-
-      const idPedido = "ORD-" + Math.floor(100000 + Math.random() * 900000);
-      const codigoCompra = "TK-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-      const fechaHora = new Date().toLocaleString('es-CO');
-
-      const datosCompra = {
-        idPedido,
-        codigoCompra,
-        cliente: currentUser.nombre,
-        seatIds: misSillasSeleccionadas,
-        total,
-        fechaHora
-      };
-
-      document.getElementById('lbl-id-pedido').textContent = `#${idPedido}`;
-      document.getElementById('lbl-nombre-cliente').textContent = currentUser.nombre;
-      document.getElementById('lbl-fecha-hora').textContent = fechaHora;
-      document.getElementById('lbl-codigo-compra').textContent = codigoCompra;
-      document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
-      document.getElementById('lbl-valor-pagar').textContent = `$${total.toLocaleString('es-CO')} COP`;
-
-      setTimeout(() => {
-        const canvas = document.getElementById('qr-canvas');
-        if (canvas) {
-          QRCode.toCanvas(canvas, JSON.stringify({ codigo: codigoCompra, pedido: idPedido }), { width: 130 });
-        }
-      }, 100);
-
-      if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
-      document.getElementById('ticket-modal').style.display = 'flex';
-    }
-
-    function imprimirComprobante() {
-      const elemento = document.getElementById('ticket-content');
-      html2pdf().set({
-        margin: 10,
-        filename: `Comprobante_${document.getElementById('lbl-codigo-compra').textContent}.pdf`,
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(elemento).save();
-    }
-
-    function compartirComprobante() {
-      const codigo = document.getElementById('lbl-codigo-compra').textContent;
-      if (navigator.share) navigator.share({ title: 'Comprobante', text: `Código: ${codigo}`, url: window.location.href });
-      else alert(`Código de compra: ${codigo}`);
-    }
-
-    function cerrarModal() {
-      document.getElementById('ticket-modal').style.display = 'none';
-      misSillasSeleccionadas = [];
-      actualizarResumen();
-      detenerCuentaRegresiva();
-    }
-
-    window.onload = () => {
-      inicializarMapa();
-      comprobarSesionGuardada();
-    };
-  </script>
-</body>
-</html>
+      Object.keys(CONFIG).forEach(key =>
