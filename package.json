@@ -1,6 +1,7 @@
 {
-  "name": "ticketmaster-backend",
+  "name": "cena-san-silvestre-2026",
   "version": "1.0.0",
+  "description": "Sistema de reservas Cena San Silvestre 2026 - Hotel Cartagena Plaza",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
