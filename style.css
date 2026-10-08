@@ -131,6 +131,17 @@ header h1 span {
   margin: 8px 4px 0 4px;
 }
 
+.stage-badge {
+  display: inline-block;
+  background: #16a34a;
+  color: #fff;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  margin-top: 6px;
+}
+
 /* Main Layout */
 .main-layout {
   display: flex;
@@ -176,7 +187,7 @@ header h1 span {
 #selected-list {
   list-style: none;
   margin-bottom: 15px;
-  max-height: 180px;
+  max-height: 200px;
   overflow-y: auto;
 }
 
@@ -186,6 +197,18 @@ header h1 span {
   font-size: 0.85rem;
   color: #374151;
   font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.type-select {
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #fdfbf7;
 }
 
 .total-box {
@@ -281,38 +304,40 @@ header h1 span {
 .dot.locked { background: #f59e0b; }
 .dot.sold { background: #ef4444; }
 
-/* Acordeones */
+/* Acordeones con Colores Oficiales del Post */
 .zone-accordion {
   margin-bottom: 16px;
-  border: 1px solid #e5e7eb;
   border-radius: 12px;
   overflow: hidden;
-  background: #fdfbf7;
+  border: 1px solid #e5e7eb;
 }
+
+.zone-accordion.sahara { border-color: #d4af37; }
+.zone-accordion.oasis { border-color: #881337; }
+.zone-accordion.nomad { border-color: #b45309; }
 
 .accordion-header {
   width: 100%;
   padding: 14px 18px;
-  background: #f8f1e5;
   border: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 800;
   cursor: pointer;
-  color: #1a1a1a;
   transition: background 0.2s;
 }
 
-.accordion-header:hover {
-  background: #f3f4f6;
-}
+.zone-accordion.sahara .accordion-header { background: #fef08a; color: #854d0e; }
+.zone-accordion.oasis .accordion-header { background: #fecdd3; color: #881337; }
+.zone-accordion.nomad .accordion-header { background: #fef3c7; color: #92400e; }
 
 .accordion-content {
   display: none;
   padding: 20px 12px;
   overflow-x: auto;
+  background: #ffffff;
 }
 
 .accordion-content.open {
@@ -393,10 +418,7 @@ header h1 span {
 
 .seat.sold { background: #ef4444 !important; cursor: not-allowed !important; opacity: 0.85; pointer-events: none !important; }
 
-/* ========================================================= */
-/* MODALES Y CAMPOS DE FORMULARIO AJUSTADOS Y HOMOGÉNEOS     */
-/* ========================================================= */
-
+/* Modales y Formularios */
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
@@ -445,7 +467,6 @@ header h1 span {
   border-bottom: 3px solid #d4af37; 
 }
 
-/* Estructura del Formulario */
 .auth-form { 
   display: flex; 
   flex-direction: column; 
@@ -459,7 +480,6 @@ header h1 span {
   width: 100%;
 }
 
-/* Estilo Homogéneo para Todos los Inputs del Proyecto */
 .auth-form input, 
 .scan-container input {
   width: 100%;
@@ -511,7 +531,6 @@ header h1 span {
   color: #000000;
 }
 
-/* Divisor de Inicio Social */
 .social-divider {
   display: flex;
   align-items: center;
@@ -538,7 +557,6 @@ header h1 span {
   width: 100%;
 }
 
-/* Comprobantes y Paneles Admin */
 .ticket-header { text-align: center; margin-bottom: 16px; }
 .ticket-header h2 { font-family: 'Playfair Display', serif; color: #000; font-size: 1.4rem; }
 
@@ -573,27 +591,14 @@ table { width: 100%; border-collapse: collapse; margin-top: 14px; min-width: 500
 th, td { padding: 10px; border-bottom: 1px solid #f3f4f6; text-align: left; font-size: 0.8rem; color: #374151; }
 th { background: #fdfbf7; color: #111827; font-weight: 800; }
 
-/* ========================================================= */
-/* MEDIA QUERIES PARA PANTALLAS PEQUEÑAS                     */
-/* ========================================================= */
-
 @media screen and (max-width: 992px) {
   .main-layout {
     flex-direction: column-reverse;
     padding: 16px;
   }
-
-  .control-panel {
-    width: 100%;
-  }
-
-  .admin-sections {
-    flex-direction: column;
-  }
-
-  .stats-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
+  .control-panel { width: 100%; }
+  .admin-sections { flex-direction: column; }
+  .stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
 }
 
 @media screen and (max-width: 600px) {
@@ -603,70 +608,18 @@ th { background: #fdfbf7; color: #111827; font-weight: 800; }
     align-items: stretch;
     text-align: center;
   }
-
-  header h1 {
-    font-size: 1.3rem;
-  }
-
-  .nav-buttons {
-    justify-content: center;
-    width: 100%;
-  }
-
-  .btn-nav {
-    flex: 1;
-    justify-content: center;
-    padding: 8px 10px;
-    font-size: 0.72rem;
-  }
-
-  .form-row {
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .event-banner-card {
-    padding: 15px 10px;
-  }
-
-  .event-banner-card h2 {
-    font-size: 1.3rem;
-  }
-
-  .artist-badge {
-    font-size: 0.7rem;
-    padding: 3px 8px;
-  }
-
-  .stage {
-    font-size: 0.75rem;
-    letter-spacing: 1px;
-    padding: 10px;
-  }
-
-  .map-container {
-    padding: 14px 8px;
-  }
-
-  .tables-grid {
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 16px;
-  }
-
-  .table-card {
-    width: 105px;
-    height: 105px;
-  }
-
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-
-  .auth-card, .ticket-card {
-    padding: 20px 16px;
-  }
-
-  .ticket-actions {
-    flex-direction: column;
-  }
+  header h1 { font-size: 1.3rem; }
+  .nav-buttons { justify-content: center; width: 100%; }
+  .btn-nav { flex: 1; justify-content: center; padding: 8px 10px; font-size: 0.72rem; }
+  .form-row { flex-direction: column; gap: 14px; }
+  .event-banner-card { padding: 15px 10px; }
+  .event-banner-card h2 { font-size: 1.3rem; }
+  .artist-badge { font-size: 0.7rem; padding: 3px 8px; }
+  .stage { font-size: 0.75rem; letter-spacing: 1px; padding: 10px; }
+  .map-container { padding: 14px 8px; }
+  .tables-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 16px; }
+  .table-card { width: 105px; height: 105px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .auth-card, .ticket-card { padding: 20px 16px; }
+  .ticket-actions { flex-direction: column; }
 }
