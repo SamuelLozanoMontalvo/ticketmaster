@@ -426,6 +426,7 @@ header h1 span {
   color: #000000;
 }
 
+/* Estilos Generales y Estados de la Silla */
 .seat {
   width: 15px;
   height: 15px;
@@ -435,14 +436,37 @@ header h1 span {
   border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-.seat.available { background: #22c55e !important; cursor: pointer; }
-.seat.available:hover { transform: scale(1.35); box-shadow: 0 0 10px #22c55e; }
+.seat.available { 
+  background: #22c55e !important; 
+  cursor: pointer; 
+}
 
-.seat.my-selection { background: #0284c7 !important; cursor: pointer; transform: scale(1.25); box-shadow: 0 0 10px #0284c7; }
+.seat.available:hover { 
+  transform: scale(1.35); 
+  box-shadow: 0 0 10px #22c55e; 
+}
 
-.seat.locked { background: #f59e0b !important; cursor: not-allowed !important; opacity: 0.8; }
+.seat.my-selection { 
+  background: #0284c7 !important; 
+  cursor: pointer; 
+  transform: scale(1.25); 
+  box-shadow: 0 0 10px #0284c7; 
+}
 
-.seat.sold { background: #ef4444 !important; cursor: not-allowed !important; opacity: 0.85; pointer-events: none !important; }
+.seat.locked { 
+  background: #f59e0b !important; 
+  cursor: not-allowed !important; 
+  opacity: 0.8; 
+}
+
+.seat.sold { 
+  background: #ef4444 !important; 
+  border-color: #b91c1c !important;
+  cursor: not-allowed !important; 
+  opacity: 1 !important; 
+  pointer-events: none !important; 
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+}
 
 /* Modales y Formularios */
 .modal-overlay {
