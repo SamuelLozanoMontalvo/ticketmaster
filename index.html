@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Venta de Entradas y Control de Acceso</title>
+  <title>Cena San Silvestre 2026 - Hotel Cartagena Plaza</title>
   
   <link rel="stylesheet" href="style.css">
 
@@ -13,19 +13,20 @@
   <script src="https://cdn.jsdelivr.net/npm/kjua@0.9.0/dist/kjua.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://checkout.wompi.co/widget.js"></script>
   
-  <!-- SweetAlert2 (Modales elegantes) -->
+  <!-- SweetAlert2, Confetti & Lucide -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <!-- Canvas Confetti (Efectos de celebración) -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
-  <!-- Lucide Icons (Iconografía moderna) -->
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
 
-  <!-- Encabezado -->
+  <!-- Encabezado Oficial -->
   <header>
-    <h1 id="app-title" style="cursor:pointer;" onclick="volverAlMapa()"><i data-lucide="ticket" style="vertical-align: middle; margin-right: 8px;"></i>Reserva de Boletos</h1>
+    <h1 id="app-title" style="cursor:pointer;" onclick="volverAlMapa()">
+      Cena San Silvestre <span>2026</span>
+    </h1>
     <div id="user-container">
       <div id="auth-buttons-group" class="nav-buttons">
         <button class="btn-nav btn-login" onclick="abrirModalAuth('login')"><i data-lucide="log-in" style="width:16px; vertical-align:middle; margin-right:4px;"></i>Iniciar Sesión</button>
@@ -34,7 +35,7 @@
       </div>
       <div id="user-info" style="display:none;">
         <span id="user-name"></span>
-        <button id="btn-mis-boletas" onclick="verMisBoletas()" class="btn-nav" style="background:#0284c7; color:white; margin-left:10px;"><i data-lucide="qr-code" style="width:16px; vertical-align:middle; margin-right:4px;"></i>Mis Boletas</button>
+        <button id="btn-mis-boletas" onclick="verMisBoletas()" class="btn-nav" style="background:#aa7c11; color:white; margin-left:10px;"><i data-lucide="qr-code" style="width:16px; vertical-align:middle; margin-right:4px;"></i>Mis Boletas</button>
         <button onclick="cerrarSesion()" class="btn-logout"><i data-lucide="log-out" style="width:16px; vertical-align:middle;"></i> Salir</button>
       </div>
     </div>
@@ -43,7 +44,7 @@
   <!-- VISTA CLIENTE / MAPA -->
   <main id="view-client" class="main-layout">
     <section class="control-panel">
-      <h2>Tu Selección</h2>
+      <h2>Reserva tu Mesa</h2>
       <div id="timer-display" class="timer">Tiempo restante: --:--</div>
       <ul id="selected-list">
         <li>No has seleccionado ningún puesto.</li>
@@ -52,10 +53,24 @@
         <strong>Total a Pagar:</strong> <span id="total-price">$0 COP</span>
       </div>
       <button id="btn-checkout" onclick="procesarReserva()" disabled>Generar Comprobante</button>
+
+      <div style="margin-top: 20px; font-size: 0.8rem; color: #6b7280; text-align: center; border-top: 1px solid #f3e8c8; padding-top: 15px;">
+        <p><strong>INCLUYE:</strong> Cena Buffet • Coctel de Bienvenida • Concierto en Vivo • DJ • Cotillones • Uvas de la Prosperidad • Fuegos Artificiales • Caldo de Amanecida • Set Fotográfico.</p>
+      </div>
     </section>
 
     <section class="map-container">
-      <div class="stage">ESCENARIO PRINCIPAL</div>
+      <!-- Tarjeta del Evento -->
+      <div class="event-banner-card">
+        <h2>CENA SAN SILVESTRE 31 DE DICIEMBRE</h2>
+        <p style="color: #d4af37; font-weight: 700; margin-top: 4px;">PLAYA DEL HOTEL CARTAGENA PLAZA</p>
+        <div>
+          <span class="artist-badge">CRISS & RONNY</span>
+          <span class="artist-badge">LESSING KERGUELEN</span>
+        </div>
+      </div>
+
+      <div class="stage">ESCENARIO PRINCIPAL / TARIMA DE ARTISTAS</div>
 
       <div class="legend">
         <span><i class="dot available"></i> Disponible</span>
@@ -218,7 +233,7 @@
         <input type="password" id="login-password" placeholder="Contraseña" required>
         <button type="submit" class="btn-submit">Ingresar</button>
 
-        <div class="social-divider">o iniciar sesión con Google</div>
+        <div style="text-align: center; font-size: 0.8rem; color: #6b7280; margin: 5px 0;">o iniciar sesión con Google</div>
 
         <div class="google-btn-wrapper">
           <div id="g_id_onload"
@@ -231,9 +246,9 @@
       </form>
 
       <form id="form-register" class="auth-form" style="display: none;" onsubmit="registroNormal(event)">
-        <div class="form-row">
-          <input type="text" id="reg-name" placeholder="Nombre" required>
-          <input type="text" id="reg-lastname" placeholder="Apellido" required>
+        <div class="form-row" style="display: flex; gap: 10px;">
+          <input type="text" id="reg-name" placeholder="Nombre" style="flex:1;" required>
+          <input type="text" id="reg-lastname" placeholder="Apellido" style="flex:1;" required>
         </div>
         <input type="tel" id="reg-phone" placeholder="Número de Celular" required>
         <input type="email" id="reg-email" placeholder="Correo electrónico" required>
@@ -277,8 +292,8 @@
   <div id="ticket-modal" class="modal-overlay" style="display: none;">
     <div class="ticket-card" id="ticket-content">
       <div class="ticket-header">
-        <h2>Comprobante de Reserva</h2>
-        <p>Presenta este comprobante para realizar tu pago</p>
+        <h2>Cena San Silvestre 2026</h2>
+        <p style="font-size: 0.85rem; color: #aa7c11; font-weight: bold;">Hotel Cartagena Plaza - Playa</p>
       </div>
 
       <div class="ticket-body">
@@ -287,16 +302,16 @@
         <div class="info-group"><label>Fecha/Hora:</label> <span id="lbl-fecha-hora"></span></div>
         <div class="info-group"><label>Código de Compra:</label> <span id="lbl-codigo-compra" class="highlight"></span></div>
         <div class="info-group"><label>Puestos:</label> <span id="lbl-puestos-detalles"></span></div>
-        <hr>
+        <hr style="border: 0; border-top: 1px solid #f3e8c8; margin: 10px 0;">
         <div class="info-group total"><label>Valor a Pagar:</label> <span id="lbl-valor-pagar"></span></div>
 
-        <div class="qr-container" style="display: flex; justify-content: center; margin: 15px 0;">
+        <div class="qr-container">
           <div id="qrcode-box"></div>
         </div>
       </div>
 
       <div class="ticket-actions" data-html2canvas-ignore="true">
-        <button onclick="imprimirComprobante()" class="btn-print"><i data-lucide="printer" style="width:16px; vertical-align:middle;"></i> Guardar PDF</button>
+        <button onclick="imprimirComprobante()" class="btn-print"><i data-lucide="printer" style="width:16px; vertical-align:middle;"></i> PDF</button>
         <button onclick="compartirComprobante()" class="btn-share"><i data-lucide="share-2" style="width:16px; vertical-align:middle;"></i> Compartir</button>
         <button onclick="cerrarModal()" class="btn-close">Cerrar</button>
       </div>
@@ -362,7 +377,7 @@
     function volverAlMapa() {
       ocultarTodasLasVistas();
       document.getElementById('view-client').style.setProperty('display', 'flex', 'important');
-      document.getElementById('app-title').innerHTML = '<i data-lucide="ticket" style="vertical-align: middle; margin-right: 8px;"></i>Reserva de Boletos';
+      document.getElementById('app-title').innerHTML = 'Cena San Silvestre <span>2026</span>';
       lucide.createIcons();
     }
 
@@ -527,7 +542,7 @@
             <td>${t.fechaHora}</td>
             <td>$${t.total.toLocaleString('es-CO')} COP</td>
             <td><span style="color: ${t.usado ? '#ef4444' : '#22c55e'}; font-weight: bold;">${t.usado ? 'Usada' : 'Válida'}</span></td>
-            <td><button onclick="reabrirComprobante('${jsonStr}')" style="background:#2563eb; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:600;">Ver QR / Comprobante</button></td>
+            <td><button onclick="reabrirComprobante('${jsonStr}')" style="background:#aa7c11; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:600;">Ver QR / Comprobante</button></td>
           </tr>`;
         });
         html += '</tbody></table>';
@@ -899,21 +914,51 @@
         fechaHora
       };
 
-      document.getElementById('lbl-id-pedido').textContent = `#${idPedido}`;
-      document.getElementById('lbl-nombre-cliente').textContent = datosCompra.cliente;
-      document.getElementById('lbl-fecha-hora').textContent = fechaHora;
-      document.getElementById('lbl-codigo-compra').textContent = codigoCompra;
-      document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
-      document.getElementById('lbl-valor-pagar').textContent = `$${total.toLocaleString('es-CO')} COP`;
+      // Si es Entrada Gratis ($0 COP)
+      if (total === 0) {
+        if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
 
-      renderizarQR(codigoCompra, idPedido);
+        document.getElementById('lbl-id-pedido').textContent = `#${idPedido}`;
+        document.getElementById('lbl-nombre-cliente').textContent = datosCompra.cliente;
+        document.getElementById('lbl-fecha-hora').textContent = fechaHora;
+        document.getElementById('lbl-codigo-compra').textContent = codigoCompra;
+        document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
+        document.getElementById('lbl-valor-pagar').textContent = `$0 COP (Gratis)`;
 
-      if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
+        renderizarQR(codigoCompra, idPedido);
+        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+        document.getElementById('ticket-modal').style.display = 'flex';
+        return;
+      }
 
-      // Lanzar animación de Confeti
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      // Si tiene costo, abrimos Wompi
+      if (typeof WidgetCheckout !== 'undefined') {
+        const checkout = new WidgetCheckout({
+          currency: 'COP',
+          amountInCents: total * 100,
+          reference: codigoCompra,
+          publicKey: 'pub_test_Q5y13W9zRPlmG2A6ujL399kL9x345678',
+          redirectUrl: window.location.href,
+          extra: { seatIds: misSillasSeleccionadas, cliente: datosCompra.cliente }
+        });
 
-      document.getElementById('ticket-modal').style.display = 'flex';
+        checkout.open(function (result) {
+          if (result.transaction.status === 'APPROVED') {
+            if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
+
+            document.getElementById('lbl-id-pedido').textContent = `#${idPedido}`;
+            document.getElementById('lbl-nombre-cliente').textContent = datosCompra.cliente;
+            document.getElementById('lbl-fecha-hora').textContent = fechaHora;
+            document.getElementById('lbl-codigo-compra').textContent = codigoCompra;
+            document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
+            document.getElementById('lbl-valor-pagar').textContent = `$${total.toLocaleString('es-CO')} COP`;
+
+            renderizarQR(codigoCompra, idPedido);
+            confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+            document.getElementById('ticket-modal').style.display = 'flex';
+          }
+        });
+      }
     }
 
     function imprimirComprobante() {
@@ -921,7 +966,7 @@
       if (typeof html2pdf !== 'undefined') {
         html2pdf().set({
           margin: 10,
-          filename: `Comprobante_${document.getElementById('lbl-codigo-compra').textContent}.pdf`,
+          filename: `Comprobante_SanSilvestre_${document.getElementById('lbl-codigo-compra').textContent}.pdf`,
           html2canvas: { scale: 2 },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         }).from(elemento).save();
@@ -932,7 +977,7 @@
 
     function compartirComprobante() {
       const codigo = document.getElementById('lbl-codigo-compra').textContent;
-      if (navigator.share) navigator.share({ title: 'Comprobante', text: `Código: ${codigo}`, url: window.location.href });
+      if (navigator.share) navigator.share({ title: 'Comprobante San Silvestre 2026', text: `Código: ${codigo}`, url: window.location.href });
       else alert(`Código de compra: ${codigo}`);
     }
 
