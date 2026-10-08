@@ -15,7 +15,10 @@ const io = new Server(server, {
 app.use(express.static(__dirname));
 
 // --- PERSISTENCIA EN ARCHIVO DATA.JSON ---
-const DATA_FILE = path.join(__dirname, 'data.json');
+// En Railway el disco se borra en cada deploy/reinicio. Monta un Volume y define DATA_DIR (ej. /data)
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+const DATA_FILE = path.join(DATA_DIR, 'data.json');
 
 let seatsState = {};
 let salesHistory = [];
@@ -158,6 +161,7 @@ io.on('connection', (socket) => {
       idPedido: datosCompra.idPedido,
       codigoCompra: datosCompra.codigoCompra,
       cliente: datosCompra.cliente,
+      email: datosCompra.email ? String(datosCompra.email).toLowerCase() : null,
       numEntradas: seatIds.length,
       puestos: seatIds,
       total: datosCompra.total,
@@ -174,8 +178,11 @@ io.on('connection', (socket) => {
   });
 
   // --- CONSULTAR ENTRADAS DE CLIENTE ---
-  socket.on('GET_USER_TICKETS', ({ cliente }) => {
-    socket.emit('USER_TICKETS_RESPONSE', salesHistory.filter(v => v.cliente === cliente));
+  socket.on('GET_USER_TICKETS', ({ cliente, email }) => {
+    const mail = email ? String(email).toLowerCase() : null;
+    socket.emit('USER_TICKETS_RESPONSE', salesHistory.filter(v =>
+      (mail && v.email === mail) || (!v.email && v.cliente === cliente)
+    ));
   });
 
   // --- LOGIN ADMIN ---
