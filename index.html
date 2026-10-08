@@ -67,7 +67,6 @@
           <span class="artist-badge">LESSING KERGUELEN</span>
         </div>
 
-        <!-- Badges de Etapas con Resaltado Dinámico en Verde -->
         <div class="stages-container">
           <span id="badge-preventa" class="stage-badge">Preventa (Hasta 15 Oct)</span>
           <span id="badge-etapa2" class="stage-badge">Etapa 2 (16 Oct - 30 Nov)</span>
@@ -519,6 +518,28 @@
       });
     }
 
+    function actualizarEstadoUI(seatId, status, esMio) {
+      const el = document.getElementById(seatId);
+      if (!el) return;
+
+      el.classList.remove('available', 'my-selection', 'locked', 'sold');
+
+      if (status === 'sold') {
+        el.classList.add('sold');
+        el.onclick = null;
+      } else if (status === 'locked') {
+        if (esMio) {
+          el.classList.add('my-selection');
+        } else {
+          el.classList.add('locked');
+          el.onclick = null;
+        }
+      } else {
+        el.classList.add('available');
+        el.onclick = (e) => { e.stopPropagation(); toggleSilla(seatId); };
+      }
+    }
+
     if (socket) {
       socket.on('ADMIN_AUTH_SUCCESS', (data) => {
         cerrarModalPortal();
@@ -544,6 +565,39 @@
 
       socket.on('ADMIN_NEW_SALE', (sales) => {
         if (currentAdmin) socket.emit('ADMIN_LOGIN', currentAdmin);
+      });
+
+      socket.on('MAP_STATE', (state) => {
+        if (!state) return;
+        Object.keys(state).forEach(id => {
+          actualizarEstadoUI(id, state[id].status, state[id].userId === socket.id);
+        });
+      });
+
+      socket.on('SEATS_LOCKED', ({ seatIds, userId, expiresAt }) => {
+        const esMio = userId === socket.id;
+        seatIds.forEach(id => {
+          actualizarEstadoUI(id, 'locked', esMio);
+          if (esMio && !misSillasSeleccionadas.includes(id)) {
+            misSillasSeleccionadas.push(id);
+            if (!tiposPuestos[id]) tiposPuestos[id] = 'ADULTO';
+          }
+        });
+        if (esMio) { iniciarCuentaRegresiva(expiresAt); actualizarResumen(); }
+      });
+
+      socket.on('SEATS_RELEASED', ({ seatIds }) => {
+        seatIds.forEach(id => {
+          actualizarEstadoUI(id, 'available', false);
+          misSillasSeleccionadas = misSillasSeleccionadas.filter(item => item !== id);
+          delete tiposPuestos[id];
+        });
+        actualizarResumen();
+        if (misSillasSeleccionadas.length === 0) detenerCuentaRegresiva();
+      });
+
+      socket.on('SEATS_SOLD', ({ seatIds }) => {
+        seatIds.forEach(id => actualizarEstadoUI(id, 'sold', false));
       });
     }
 
@@ -746,7 +800,6 @@
     }
 
     function inicializarMapa() {
-      // Activar visualmente solo el badge de la etapa actual en VERDE
       const etapaInfo = obtenerEtapaActual();
       ['badge-preventa', 'badge-etapa2', 'badge-full'].forEach(id => {
         const el = document.getElementById(id);
@@ -826,67 +879,6 @@
       }
 
       socket.emit('LOCK_SEATS', { seatIds: sillasMesa });
-    }
-
-    function actualizarEstadoUI(seatId, status, esMio) {
-  const el = document.getElementById(seatId);
-  if (!el) return;
-
-  // 1. Limpiar todas las clases posibles previamente asignadas
-  el.classList.remove('available', 'my-selection', 'locked', 'sold');
-
-  // 2. Asignar el estado correcto
-  if (status === 'sold') {
-    el.classList.add('sold');
-    el.onclick = null; // Desactivar clics
-  } else if (status === 'locked') {
-    if (esMio) {
-      el.classList.add('my-selection');
-    } else {
-      el.classList.add('locked');
-      el.onclick = null;
-    }
-  } else {
-    el.classList.add('available');
-    el.onclick = (e) => { e.stopPropagation(); toggleSilla(seatId); };
-  }
-}
-
-    if (socket) {
-      socket.on('MAP_STATE', (state) => {
-        Object.keys(state).forEach(id => {
-          actualizarEstadoUI(id, state[id].status, state[id].userId === socket.id);
-        });
-      });
-
-      socket.on('SEATS_LOCKED', ({ seatIds, userId, expiresAt }) => {
-        const esMio = userId === socket.id;
-        seatIds.forEach(id => {
-          actualizarEstadoUI(id, 'locked', esMio);
-          if (esMio && !misSillasSeleccionadas.includes(id)) {
-            misSillasSeleccionadas.push(id);
-            if (!tiposPuestos[id]) tiposPuestos[id] = 'ADULTO';
-          }
-        });
-        if (esMio) { iniciarCuentaRegresiva(expiresAt); actualizarResumen(); }
-      });
-
-      socket.on('SEATS_RELEASED', ({ seatIds }) => {
-        seatIds.forEach(id => {
-          const el = document.getElementById(id);
-          if (el && !el.classList.contains('sold')) {
-            actualizarEstadoUI(id, 'available', false);
-          }
-          misSillasSeleccionadas = misSillasSeleccionadas.filter(item => item !== id);
-          delete tiposPuestos[id];
-        });
-        actualizarResumen();
-        if (misSillasSeleccionadas.length === 0) detenerCuentaRegresiva();
-      });
-
-      socket.on('SEATS_SOLD', ({ seatIds }) => {
-        seatIds.forEach(id => actualizarEstadoUI(id, 'sold', false));
-      });
     }
 
     function cambiarTipoPuesto(seatId, tipo) {
@@ -1029,7 +1021,7 @@
       }
     }
 
-    function compartiComprobante() {
+    function compartirComprobante() {
       const codigo = document.getElementById('lbl-codigo-compra').textContent;
       if (navigator.share) navigator.share({ title: 'Comprobante San Silvestre 2026', text: `Código: ${codigo}`, url: window.location.href });
       else alert(`Código de compra: ${codigo}`);
@@ -1044,9 +1036,15 @@
     }
 
     window.onload = () => {
+      // 1. Construir las mesas y la UI del DOM
       inicializarMapa();
       comprobarSesionGuardada();
       lucide.createIcons();
+
+      // 2. Pedir estado del mapa inmediatamente para pintar sillas rojas de inmediato
+      if (socket) {
+        socket.emit('GET_MAP_STATE');
+      }
     };
   </script>
 </body>
