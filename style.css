@@ -6,9 +6,9 @@
   padding: 0;
   font-family: 'Plus Jakarta Sans', sans-serif;
 }
-
+//hlola
 body {
-  background: radial-gradient(circle at top, #1e1b4b 0%, #0f172a 60%, #020617 100%);
+  background: radial-gradient(circle at top, #1e1b4b 0%, #0f172a 55%, #020617 100%);
   color: #f8fafc;
   min-height: 100vh;
 }
