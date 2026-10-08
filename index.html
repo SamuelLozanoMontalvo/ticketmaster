@@ -66,6 +66,7 @@
           <span class="artist-badge">CRISS & RONNY</span>
           <span class="artist-badge">LESSING KERGUELEN</span>
         </div>
+        <div id="stage-banner-badge" class="stage-badge">Cargando etapa...</div>
       </div>
 
       <div class="stage">ESCENARIO PRINCIPAL / TARIMA DE ARTISTAS</div>
@@ -78,33 +79,33 @@
       </div>
 
       <div class="zones-wrapper">
-        <div class="zone-accordion">
-          <button class="accordion-header active" onclick="toggleZone('diamond')">
-            <span>Zona Diamond ($100.000 COP/puesto)</span>
+        <div class="zone-accordion sahara">
+          <button class="accordion-header active" onclick="toggleZone('sahara')">
+            <span>ZONA SAHARA</span>
             <span class="icon">▼</span>
           </button>
-          <div class="accordion-content open" id="zone-content-diamond">
-            <div class="tables-grid" id="zone-diamond"></div>
+          <div class="accordion-content open" id="zone-content-sahara">
+            <div class="tables-grid" id="zone-sahara"></div>
           </div>
         </div>
 
-        <div class="zone-accordion">
-          <button class="accordion-header" onclick="toggleZone('gold')">
-            <span>Zona Gold ($70.000 COP/puesto)</span>
+        <div class="zone-accordion oasis">
+          <button class="accordion-header" onclick="toggleZone('oasis')">
+            <span>ZONA OASIS</span>
             <span class="icon">►</span>
           </button>
-          <div class="accordion-content" id="zone-content-gold">
-            <div class="tables-grid" id="zone-gold"></div>
+          <div class="accordion-content" id="zone-content-oasis">
+            <div class="tables-grid" id="zone-oasis"></div>
           </div>
         </div>
 
-        <div class="zone-accordion">
-          <button class="accordion-header" onclick="toggleZone('silver')">
-            <span>Zona Silver ($40.000 COP/puesto)</span>
+        <div class="zone-accordion nomad">
+          <button class="accordion-header" onclick="toggleZone('nomad')">
+            <span>ZONA NOMAD</span>
             <span class="icon">►</span>
           </button>
-          <div class="accordion-content" id="zone-content-silver">
-            <div class="tables-grid" id="zone-silver"></div>
+          <div class="accordion-content" id="zone-content-nomad">
+            <div class="tables-grid" id="zone-nomad"></div>
           </div>
         </div>
       </div>
@@ -330,14 +331,52 @@
     let currentAdmin = null;
     let currentStaff = null;
     let misSillasSeleccionadas = [];
+    let tiposPuestos = {}; // Guarda si el puesto es 'ADULTO' o 'NIÑO'
     let countdownTimer = null;
     let html5QrcodeScanner = null;
 
-    const PRECIOS = { DIAMOND: 100000, GOLD: 70000, SILVER: 40000 };
+    // MATRIZ DE PRECIOS OFICIALES SEGÚN FLYER Y FECHAS
+    const TABLA_PRECIOS = {
+      PREVENTA: { // Hasta 15 Oct
+        SAHARA: { ADULTO: 1050000, NINO: 420000 },
+        OASIS:  { ADULTO: 950000,  NINO: 420000 },
+        NOMAD:  { ADULTO: 850000,  NINO: 420000 }
+      },
+      ETAPA2: { // 16 Oct al 30 Nov
+        SAHARA: { ADULTO: 1100000, NINO: 490000 },
+        OASIS:  { ADULTO: 1000000, NINO: 490000 },
+        NOMAD:  { ADULTO: 900000,  NINO: 490000 }
+      },
+      FULL: { // A partir de 1 Dic
+        SAHARA: { ADULTO: 1200000, NINO: 550000 },
+        OASIS:  { ADULTO: 1100000, NINO: 550000 },
+        NOMAD:  { ADULTO: 1000000, NINO: 550000 }
+      }
+    };
+
+    function obtenerEtapaActual() {
+      const hoy = new Date();
+      const mes = hoy.getMonth() + 1; // 1 - 12
+      const dia = hoy.getDate();
+
+      // Si es antes del 16 de Octubre
+      if (mes < 10 || (mes === 10 && dia <= 15)) {
+        return { clave: 'PREVENTA', nombre: 'Etapa Preventa (Hasta el 15 de Oct)' };
+      }
+      // Entre 16 Octubre y 30 de Noviembre
+      else if ((mes === 10 && dia >= 16) || mes === 11) {
+        return { clave: 'ETAPA2', nombre: 'Etapa 2 (16 Oct al 30 Nov)' };
+      }
+      // A partir del 1 de Diciembre
+      else {
+        return { clave: 'FULL', nombre: 'Precio Full (A partir del 1 de Dic)' };
+      }
+    }
+
     const CONFIG = {
-      DIAMOND: { start: 'A', end: 'B', zoneName: 'DIAMOND' },
-      GOLD: { start: 'C', end: 'H', zoneName: 'GOLD' },
-      SILVER: { start: 'I', end: 'L', zoneName: 'SILVER' }
+      SAHARA: { start: 'A', end: 'B', zoneName: 'SAHARA' },
+      OASIS:  { start: 'C', end: 'H', zoneName: 'OASIS' },
+      NOMAD:  { start: 'I', end: 'L', zoneName: 'NOMAD' }
     };
 
     function comprobarSesionGuardada() {
@@ -387,7 +426,7 @@
     }
 
     function toggleZone(selectedZone) {
-      const zones = ['diamond', 'gold', 'silver'];
+      const zones = ['sahara', 'oasis', 'nomad'];
       zones.forEach(z => {
         const content = document.getElementById(`zone-content-${z}`);
         const header = content.previousElementSibling;
@@ -707,6 +746,9 @@
     }
 
     function inicializarMapa() {
+      const etapaInfo = obtenerEtapaActual();
+      document.getElementById('stage-banner-badge').textContent = etapaInfo.nombre;
+
       Object.keys(CONFIG).forEach(key => {
         const conf = CONFIG[key];
         const container = document.getElementById(`zone-${key.toLowerCase()}`);
@@ -736,7 +778,7 @@
         const seat = document.createElement('div');
         seat.className = 'seat available';
         seat.id = seatId;
-        seat.dataset.precio = PRECIOS[zona];
+        seat.dataset.zona = zona;
 
         const angle = (s - 1) * 36 * (Math.PI / 180);
         seat.style.left = `${55 + 52 * Math.cos(angle) - 8}px`;
@@ -809,7 +851,10 @@
         const esMio = userId === socket.id;
         seatIds.forEach(id => {
           actualizarEstadoUI(id, 'locked', esMio);
-          if (esMio && !misSillasSeleccionadas.includes(id)) misSillasSeleccionadas.push(id);
+          if (esMio && !misSillasSeleccionadas.includes(id)) {
+            misSillasSeleccionadas.push(id);
+            if (!tiposPuestos[id]) tiposPuestos[id] = 'ADULTO'; // Por defecto Adulto
+          }
         });
         if (esMio) { iniciarCuentaRegresiva(expiresAt); actualizarResumen(); }
       });
@@ -821,6 +866,7 @@
             actualizarEstadoUI(id, 'available', false);
           }
           misSillasSeleccionadas = misSillasSeleccionadas.filter(item => item !== id);
+          delete tiposPuestos[id];
         });
         actualizarResumen();
         if (misSillasSeleccionadas.length === 0) detenerCuentaRegresiva();
@@ -829,6 +875,20 @@
       socket.on('SEATS_SOLD', ({ seatIds }) => {
         seatIds.forEach(id => actualizarEstadoUI(id, 'sold', false));
       });
+    }
+
+    function cambiarTipoPuesto(seatId, tipo) {
+      tiposPuestos[seatId] = tipo;
+      actualizarResumen();
+    }
+
+    function calcularPrecioPuesto(seatId) {
+      const el = document.getElementById(seatId);
+      const zona = el ? el.dataset.zona : 'SAHARA';
+      const etapa = obtenerEtapaActual().clave;
+      const tipo = tiposPuestos[seatId] || 'ADULTO';
+
+      return TABLA_PRECIOS[etapa][zona][tipo];
     }
 
     function actualizarResumen() {
@@ -842,11 +902,18 @@
         btn.disabled = true;
       } else {
         misSillasSeleccionadas.forEach(id => {
-          const el = document.getElementById(id);
-          const precio = (el && el.dataset && el.dataset.precio) ? parseInt(el.dataset.precio) : 0;
+          const precio = calcularPrecioPuesto(id);
           total += precio;
+
+          const tipoActual = tiposPuestos[id] || 'ADULTO';
           const li = document.createElement('li');
-          li.textContent = `${id} - $${precio.toLocaleString('es-CO')} COP`;
+          li.innerHTML = `
+            <span><strong>${id}</strong> - $${precio.toLocaleString('es-CO')}</span>
+            <select class="type-select" onchange="cambiarTipoPuesto('${id}', this.value)">
+              <option value="ADULTO" ${tipoActual === 'ADULTO' ? 'selected' : ''}>Adulto</option>
+              <option value="NINO" ${tipoActual === 'NINO' ? 'selected' : ''}>Niño (4-11 años)</option>
+            </select>
+          `;
           listEl.appendChild(li);
         });
         btn.disabled = false;
@@ -895,16 +962,18 @@
       }
     }
 
-    // GENERACIÓN DIRECTA DE COMPROBANTE SIN PASARELAS
     function procesarReserva() {
       const activeUser = currentUser || currentAdmin;
       if (!activeUser) return abrirModalAuth('login');
       if (misSillasSeleccionadas.length === 0) return Swal.fire('Atención', 'Por favor selecciona al menos una silla.', 'info');
 
       let total = 0;
+      const detallesPuestos = [];
+
       misSillasSeleccionadas.forEach(id => {
-        const el = document.getElementById(id);
-        if (el && el.dataset.precio) total += parseInt(el.dataset.precio);
+        const precio = calcularPrecioPuesto(id);
+        total += precio;
+        detallesPuestos.push(`${id} (${tiposPuestos[id] || 'ADULTO'})`);
       });
 
       const idPedido = "ORD-" + Math.floor(100000 + Math.random() * 900000);
@@ -926,7 +995,7 @@
       document.getElementById('lbl-nombre-cliente').textContent = datosCompra.cliente;
       document.getElementById('lbl-fecha-hora').textContent = fechaHora;
       document.getElementById('lbl-codigo-compra').textContent = codigoCompra;
-      document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
+      document.getElementById('lbl-puestos-detalles').textContent = detallesPuestos.join(', ');
       document.getElementById('lbl-valor-pagar').textContent = `$${total.toLocaleString('es-CO')} COP`;
 
       renderizarQR(codigoCompra, idPedido);
@@ -957,6 +1026,7 @@
     function cerrarModal() {
       document.getElementById('ticket-modal').style.display = 'none';
       misSillasSeleccionadas = [];
+      tiposPuestos = {};
       actualizarResumen();
       detenerCuentaRegresiva();
     }
