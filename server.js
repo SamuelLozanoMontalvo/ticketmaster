@@ -47,16 +47,24 @@ function cargarDatos() {
   Object.keys(seatsState).forEach(id => {
     if (seatsState[id].status !== 'sold') delete seatsState[id];
   });
+  // Reparar ventas dañadas (hechas con una versión vieja del servidor: sin código/fecha)
+  salesHistory = salesHistory.filter(v => v && Array.isArray(v.puestos) && v.puestos.length > 0);
+  salesHistory.forEach(v => {
+    if (!v.codigoCompra) v.codigoCompra = 'TK-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+    if (!v.idPedido) v.idPedido = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
+    if (!v.fechaHora) v.fechaHora = 'Sin fecha';
+    if (!v.cliente || /undefined/.test(v.cliente)) v.cliente = 'RESERVA ADMIN';
+    if (typeof v.total !== 'number') v.total = 0;
+    v.numEntradas = v.puestos.length;
+  });
   salesHistory.forEach(v => v.puestos.forEach(id => { seatsState[id] = { status: 'sold' }; }));
 }
 
 function guardarDatos() {
   try {
-    fs.writeFileSync(
-      DATA_FILE,
-      JSON.stringify({ seatsState, salesHistory, staffUsers, adminSessions }, null, 2),
-      'utf8'
-    );
+    const tmp = DATA_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify({ seatsState, salesHistory, staffUsers, adminSessions }, null, 2), 'utf8');
+    fs.renameSync(tmp, DATA_FILE); // escritura atómica: evita data.json corrupto
   } catch (err) {
     console.error('Error guardando en data.json:', err);
   }
@@ -111,7 +119,11 @@ function codigoUnico(prefix, genFn, campo) {
   return c;
 }
 
+const SERVER_VERSION = 2;
+const PERSISTENTE = !!process.env.DATA_DIR;
+
 io.on('connection', (socket) => {
+  socket.emit('SERVER_INFO', { version: SERVER_VERSION, persistent: PERSISTENTE });
   socket.emit('MAP_STATE', seatsState);
 
   socket.on('GET_MAP_STATE', () => socket.emit('MAP_STATE', seatsState));
@@ -187,6 +199,11 @@ io.on('connection', (socket) => {
 
     // El servidor genera los códigos, el total y la fecha (no se confía en el cliente)
     const adminUser = datosCompra.adminToken ? (adminSessions[datosCompra.adminToken] || null) : null;
+    if (datosCompra.adminToken && !adminUser) {
+      socket.emit('ADMIN_SESSION_INVALID');
+      socket.emit('PURCHASE_FAILED', { message: 'Tu sesión de administrador expiró. Inicia sesión de nuevo.' });
+      return;
+    }
     const sale = {
       idPedido: codigoUnico('ORD-', () => String(Math.floor(100000 + Math.random() * 900000)), 'idPedido'),
       codigoCompra: codigoUnico('TK-', () => crypto.randomBytes(4).toString('hex').substring(0, 6).toUpperCase(), 'codigoCompra'),
@@ -291,6 +308,18 @@ io.on('connection', (socket) => {
     io.emit('SEATS_RELEASED', { seatIds: ticket.puestos });
     broadcastAdminData();
     socket.emit('ADMIN_ACTION_RESULT', { ok: true, message: `Boleta ${codigoCompra} eliminada. Las sillas quedaron libres.` });
+  });
+
+  // --- BORRAR TODAS LAS BOLETAS Y LIBERAR TODAS LAS SILLAS (ADMIN) ---
+  socket.on('RESET_ALL_SALES', ({ token } = {}) => {
+    if (!requireAdmin(socket, token)) return;
+    Object.keys(activeTimers).forEach(id => { clearTimeout(activeTimers[id]); delete activeTimers[id]; });
+    salesHistory = [];
+    seatsState = {};
+    guardarDatos();
+    io.emit('MAP_STATE', seatsState);
+    broadcastAdminData();
+    socket.emit('ADMIN_ACTION_RESULT', { ok: true, message: 'Se eliminaron TODAS las boletas y se liberaron todas las sillas.' });
   });
 
   // --- CREAR / ELIMINAR STAFF (ADMIN) ---
