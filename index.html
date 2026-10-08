@@ -18,7 +18,7 @@
 
   <!-- Encabezado -->
   <header>
-    <h1 id="app-title">Reserva de Boletos</h1>
+    <h1 id="app-title" style="cursor:pointer;" onclick="volverAlMapa()">Reserva de Boletos</h1>
     <div id="user-container">
       <div id="auth-buttons-group" class="nav-buttons">
         <button class="btn-nav btn-login" onclick="abrirModalAuth('login')">Iniciar Sesión</button>
@@ -33,7 +33,7 @@
     </div>
   </header>
 
-  <!-- VISTA CLIENTE -->
+  <!-- VISTA CLIENTE (MAPA) -->
   <main id="view-client" class="main-layout">
     <section class="control-panel">
       <h2>Tu Selección</h2>
@@ -58,7 +58,6 @@
       </div>
 
       <div class="zones-wrapper">
-        <!-- Acordeón Zona Diamond -->
         <div class="zone-accordion">
           <button class="accordion-header active" onclick="toggleZone('diamond')">
             <span>Zona Diamond ($100.000 COP/puesto)</span>
@@ -69,7 +68,6 @@
           </div>
         </div>
 
-        <!-- Acordeón Zona Gold -->
         <div class="zone-accordion">
           <button class="accordion-header" onclick="toggleZone('gold')">
             <span>Zona Gold ($70.000 COP/puesto)</span>
@@ -80,7 +78,6 @@
           </div>
         </div>
 
-        <!-- Acordeón Zona Silver -->
         <div class="zone-accordion">
           <button class="accordion-header" onclick="toggleZone('silver')">
             <span>Zona Silver ($40.000 COP/puesto)</span>
@@ -94,20 +91,24 @@
     </section>
   </main>
 
-  <!-- VISTA MIS BOLETAS (CLIENTE) -->
-  <div id="view-my-tickets" class="admin-dashboard">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
+  <!-- VISTA MIS BOLETAS -->
+  <div id="view-my-tickets" style="display: none; padding: 20px; max-width: 1000px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h2>Mis Boletas Compradas</h2>
-      <button onclick="volverAlMapa()" class="btn-submit" style="width: auto;">Volver al Mapa</button>
+      <button onclick="volverAlMapa()" class="btn-submit" style="width: auto; padding: 8px 16px;">Volver al Inicio</button>
     </div>
-    <div id="my-tickets-container" class="admin-box" style="margin-top: 20px;">
-      <p>Cargando tus boletas...</p>
+    
+    <div id="my-tickets-container" class="admin-box" style="text-align: center; padding: 30px;">
+      <p>Cargando tus entradas...</p>
     </div>
   </div>
 
   <!-- VISTA ADMIN -->
-  <div id="view-admin" class="admin-dashboard">
-    <h2>Panel de Control Administrador</h2>
+  <div id="view-admin" style="display: none; padding: 20px; max-width: 1400px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2>Panel de Control Administrador</h2>
+      <button onclick="volverAlMapa()" class="btn-submit" style="width: auto; padding: 8px 16px; background: #64748b;">Volver al Mapa</button>
+    </div>
 
     <div class="stats-grid">
       <div class="stat-card">
@@ -172,14 +173,18 @@
   </div>
 
   <!-- VISTA STAFF / ESCÁNER -->
-  <div id="view-staff" class="staff-dashboard">
+  <div id="view-staff" style="display: none; padding: 20px; max-width: 600px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2>Control de Acceso Staff</h2>
+      <button onclick="volverAlMapa()" class="btn-submit" style="width: auto; padding: 8px 16px; background: #64748b;">Volver al Mapa</button>
+    </div>
+
     <div class="scan-container">
-      <h2>Control de Acceso / Validación QR</h2>
       <p>Escanea el código QR o ingresa el código manual de compra:</p>
 
       <div style="display: flex; gap: 10px; margin-bottom: 15px;">
         <input type="text" id="input-manual-code" placeholder="Código (Ej: TK-X892A)" style="padding: 10px; flex: 1; border: 1px solid #cbd5e1; border-radius: 6px;">
-        <button onclick="validarCodigoManual()" class="btn-submit" style="margin-top: 0;">Validar</button>
+        <button onclick="validarCodigoManual()" class="btn-submit" style="margin-top: 0; width: auto;">Validar</button>
       </div>
 
       <div id="reader"></div>
@@ -301,7 +306,6 @@
       SILVER: { start: 'I', end: 'L', zoneName: 'SILVER' }
     };
 
-    // PERSISTENCIA DE SESIÓN CON LOCALSTORAGE
     function comprobarSesionGuardada() {
       const userSaved = localStorage.getItem('ticket_user');
       const staffSaved = localStorage.getItem('ticket_staff');
@@ -316,9 +320,22 @@
     }
 
     function mostrarUsuarioEnHeader(nombre) {
-      document.getElementById('auth-buttons-group').style.display = 'none';
-      document.getElementById('user-info').style.display = 'block';
+      document.getElementById('auth-buttons-group').setAttribute('style', 'display: none !important');
+      document.getElementById('user-info').setAttribute('style', 'display: block !important');
       document.getElementById('user-name').textContent = `Hola, ${nombre}`;
+    }
+
+    function ocultarTodasLasVistas() {
+      document.getElementById('view-client').style.setProperty('display', 'none', 'important');
+      document.getElementById('view-admin').style.setProperty('display', 'none', 'important');
+      document.getElementById('view-staff').style.setProperty('display', 'none', 'important');
+      document.getElementById('view-my-tickets').style.setProperty('display', 'none', 'important');
+    }
+
+    function volverAlMapa() {
+      ocultarTodasLasVistas();
+      document.getElementById('view-client').style.setProperty('display', 'flex', 'important');
+      document.getElementById('app-title').textContent = 'Reserva de Boletos';
     }
 
     function toggleZone(selectedZone) {
@@ -388,19 +405,15 @@
       currentUser = null; currentStaff = null;
       localStorage.removeItem('ticket_user');
       localStorage.removeItem('ticket_staff');
-      document.getElementById('auth-buttons-group').style.display = 'flex';
-      document.getElementById('user-info').style.display = 'none';
-      document.getElementById('view-client').style.display = 'flex';
-      document.getElementById('view-admin').style.display = 'none';
-      document.getElementById('view-staff').style.display = 'none';
-      document.getElementById('view-my-tickets').style.display = 'none';
-      document.getElementById('app-title').textContent = 'Reserva de Boletos';
+      document.getElementById('auth-buttons-group').setAttribute('style', 'display: flex !important');
+      document.getElementById('user-info').setAttribute('style', 'display: none !important');
+      volverAlMapa();
       if (html5QrcodeScanner) html5QrcodeScanner.clear();
     }
 
     function loginAdmin(e) {
       e.preventDefault();
-      if (!socket) return alert("Error de conexión.");
+      if (!socket) return alert("Error de conexión con el servidor.");
       socket.emit('ADMIN_LOGIN', {
         username: document.getElementById('admin-user').value,
         password: document.getElementById('admin-pass').value
@@ -409,7 +422,7 @@
 
     function loginStaff(e) {
       e.preventDefault();
-      if (!socket) return alert("Error de conexión.");
+      if (!socket) return alert("Error de conexión con el servidor.");
       socket.emit('STAFF_LOGIN', {
         username: document.getElementById('staff-user').value,
         password: document.getElementById('staff-pass').value
@@ -419,10 +432,8 @@
     if (socket) {
       socket.on('ADMIN_AUTH_SUCCESS', (data) => {
         cerrarModalPortal();
-        document.getElementById('view-client').style.display = 'none';
-        document.getElementById('view-staff').style.display = 'none';
-        document.getElementById('view-my-tickets').style.display = 'none';
-        document.getElementById('view-admin').style.display = 'block';
+        ocultarTodasLasVistas();
+        document.getElementById('view-admin').style.setProperty('display', 'block', 'important');
         document.getElementById('app-title').textContent = 'Panel de Administración';
         mostrarUsuarioEnHeader('Administrador');
         renderAdminData(data.sales, data.staffList, data.totalCapacity);
@@ -440,35 +451,33 @@
     }
 
     function iniciarVistaStaff(staff) {
-      document.getElementById('view-client').style.display = 'none';
-      document.getElementById('view-admin').style.display = 'none';
-      document.getElementById('view-my-tickets').style.display = 'none';
-      document.getElementById('view-staff').style.display = 'block';
-      document.getElementById('app-title').textContent = `Módulo de Escaneo - ${staff.nombre}`;
+      ocultarTodasLasVistas();
+      document.getElementById('view-staff').style.setProperty('display', 'block', 'important');
+      document.getElementById('app-title').textContent = `Módulo Escáner - ${staff.nombre}`;
       mostrarUsuarioEnHeader(`Staff: ${staff.nombre}`);
       iniciarEscaner();
     }
 
-    // MIS BOLETAS
+    // VISTA "MIS BOLETAS"
     function verMisBoletas() {
       if (!currentUser) return abrirModalAuth('login');
       if (!socket) return;
 
-      document.getElementById('view-client').style.display = 'none';
-      document.getElementById('view-my-tickets').style.display = 'block';
+      ocultarTodasLasVistas();
+      document.getElementById('view-my-tickets').style.setProperty('display', 'block', 'important');
       socket.emit('GET_USER_TICKETS', { cliente: currentUser.nombre });
-    }
-
-    function volverAlMapa() {
-      document.getElementById('view-my-tickets').style.display = 'none';
-      document.getElementById('view-client').style.display = 'flex';
     }
 
     if (socket) {
       socket.on('USER_TICKETS_RESPONSE', (tickets) => {
         const container = document.getElementById('my-tickets-container');
-        if (tickets.length === 0) {
-          container.innerHTML = '<p>No has comprado boletas aún.</p>';
+        if (!tickets || tickets.length === 0) {
+          container.innerHTML = `
+            <div style="padding: 20px 0;">
+              <h3 style="color: #64748b; margin-bottom: 15px;">No tienes entradas registradas.</h3>
+              <button onclick="volverAlMapa()" class="btn-submit" style="width: auto; padding: 10px 20px;">Obtener mis entradas</button>
+            </div>
+          `;
           return;
         }
 
@@ -544,6 +553,7 @@
     }
 
     function iniciarEscaner() {
+      if (html5QrcodeScanner) html5QrcodeScanner.clear();
       html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
       html5QrcodeScanner.render((decodedText) => {
         try {
@@ -579,6 +589,7 @@
         const conf = CONFIG[key];
         const container = document.getElementById(`zone-${key.toLowerCase()}`);
         if (!container) return;
+        container.innerHTML = '';
         for (let charCode = conf.start.charCodeAt(0); charCode <= conf.end.charCodeAt(0); charCode++) {
           const letra = String.fromCharCode(charCode);
           for (let i = 1; i <= 5; i++) {
@@ -697,6 +708,7 @@
       document.getElementById('timer-display').textContent = 'Tiempo restante: --:--';
     }
 
+    // GENERAR COMPROBANTE
     function procesarReserva() {
       if (!currentUser) return abrirModalAuth('login');
       let total = 0;
@@ -722,7 +734,12 @@
       document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
       document.getElementById('lbl-valor-pagar').textContent = `$${total.toLocaleString('es-CO')} COP`;
 
-      QRCode.toCanvas(document.getElementById('qr-canvas'), JSON.stringify({ codigo: codigoCompra, pedido: idPedido }), { width: 130 });
+      setTimeout(() => {
+        const canvas = document.getElementById('qr-canvas');
+        if (canvas) {
+          QRCode.toCanvas(canvas, JSON.stringify({ codigo: codigoCompra, pedido: idPedido }), { width: 130 });
+        }
+      }, 100);
 
       if (socket) socket.emit('CONFIRM_PURCHASE', datosCompra);
       document.getElementById('ticket-modal').style.display = 'flex';
