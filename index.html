@@ -97,7 +97,7 @@
       <button onclick="volverAlMapa()" class="btn-submit" style="width: auto; padding: 8px 16px;">Volver al Inicio</button>
     </div>
     
-    <div id="my-tickets-container" class="admin-box" style="text-align: center; padding: 30px;">
+    <div id="my-tickets-container" class="admin-box" style="text-align: center; padding: 20px;">
       <p>Cargando tus entradas...</p>
     </div>
   </div>
@@ -507,19 +507,43 @@
           return;
         }
 
-        let html = '<table><thead><tr><th>Código</th><th>Puestos</th><th>Fecha</th><th>Total</th><th>Estado</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>Código</th><th>Puestos</th><th>Fecha</th><th>Total</th><th>Estado</th><th>Acción</th></tr></thead><tbody>';
         tickets.forEach(t => {
+          const jsonStr = encodeURIComponent(JSON.stringify(t));
           html += `<tr>
             <td><strong>${t.codigoCompra}</strong></td>
             <td>${t.puestos.join(', ')}</td>
             <td>${t.fechaHora}</td>
             <td>$${t.total.toLocaleString('es-CO')} COP</td>
             <td><span style="color: ${t.usado ? '#ef4444' : '#22c55e'}; font-weight: bold;">${t.usado ? 'Usada' : 'Válida'}</span></td>
+            <td><button onclick="reabrirComprobante('${jsonStr}')" style="background:#2563eb; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:600;">Ver QR / Comprobante</button></td>
           </tr>`;
         });
         html += '</tbody></table>';
         container.innerHTML = html;
       });
+    }
+
+    function reabrirComprobante(jsonEncoded) {
+      const t = JSON.parse(decodeURIComponent(jsonEncoded));
+      document.getElementById('lbl-id-pedido').textContent = `#${t.idPedido}`;
+      document.getElementById('lbl-nombre-cliente').textContent = t.cliente;
+      document.getElementById('lbl-fecha-hora').textContent = t.fechaHora;
+      document.getElementById('lbl-codigo-compra').textContent = t.codigoCompra;
+      document.getElementById('lbl-puestos-detalles').textContent = t.puestos.join(', ');
+      document.getElementById('lbl-valor-pagar').textContent = `$${t.total.toLocaleString('es-CO')} COP`;
+
+      const qrBox = document.getElementById('qrcode-box');
+      qrBox.innerHTML = '';
+      if (typeof QRCode !== 'undefined') {
+        new QRCode(qrBox, {
+          text: JSON.stringify({ codigo: t.codigoCompra, pedido: t.idPedido }),
+          width: 140,
+          height: 140
+        });
+      }
+
+      document.getElementById('ticket-modal').style.display = 'flex';
     }
 
     function renderAdminData(sales, staffList, totalCapacity) {
@@ -697,7 +721,6 @@
       const el = document.getElementById(seatId);
       if (!el) return;
 
-      // Limpiar clases
       el.classList.remove('available', 'my-selection', 'locked', 'sold');
 
       if (status === 'sold') {
@@ -735,7 +758,6 @@
       socket.on('SEATS_RELEASED', ({ seatIds }) => {
         seatIds.forEach(id => {
           const el = document.getElementById(id);
-          // NUNCA liberar si ya está vendida en rojo
           if (el && !el.classList.contains('sold')) {
             actualizarEstadoUI(id, 'available', false);
           }
@@ -825,7 +847,6 @@
       document.getElementById('lbl-puestos-detalles').textContent = misSillasSeleccionadas.join(', ');
       document.getElementById('lbl-valor-pagar').textContent = `$${total.toLocaleString('es-CO')} COP`;
 
-      // GENERACIÓN DEL CÓDIGO QR
       const qrBox = document.getElementById('qrcode-box');
       qrBox.innerHTML = '';
       if (typeof QRCode !== 'undefined') {
