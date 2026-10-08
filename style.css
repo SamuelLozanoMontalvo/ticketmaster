@@ -54,7 +54,7 @@ header h1 {
   color: white;
   border: none;
   padding: 6px 12px;
-  border-radius: 4px;
+  border-radius: 6px;
   margin-left: 10px;
   cursor: pointer;
 }
@@ -211,17 +211,17 @@ header h1 {
 /* Cuadrícula de Mesas */
 .tables-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 25px;
   justify-items: center;
 }
 
-/* Tarjeta de Mesa Redonda */
+/* TARJETA / MESA REDONDA */
 .table-card {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
-  background-color: #e2e8f0;
+  background-color: #f1f5f9;
   position: relative;
   display: flex;
   align-items: center;
@@ -233,27 +233,30 @@ header h1 {
   text-align: center;
   font-size: 0.8rem;
   z-index: 2;
+  color: #0f172a;
 }
 
+/* BOTÓN "TODA LA MESA" COMPACTO */
 .btn-buy-table {
   display: block;
-  font-size: 0.65rem;
-  padding: 4px 8px;
-  background-color: #1e293b; /* Negro suave / Gris muy oscuro */
-  color: #ffffff;            /* Letras blancas */
-  border: 1px solid #334155;  /* Borde discreto para dar estructura */
-  border-radius: 6px;        /* Esquinas suavizadas / redondeadas */
-  margin-top: 4px;
+  font-size: 0.55rem;
+  padding: 2px 5px;
+  background-color: #334155;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  margin-top: 2px;
   cursor: pointer;
   font-weight: 600;
-  transition: background-color 0.2s ease;
+  white-space: nowrap;
+  transition: background-color 0.2s;
 }
 
 .btn-buy-table:hover {
-  background-color: #334155; /* Tono un poco más claro al pasar el cursor */
+  background-color: #0f172a;
 }
 
-/* SILLAS (Estilos y Colores Estrictos) */
+/* SILLAS */
 .seat {
   width: 16px;
   height: 16px;
@@ -263,7 +266,6 @@ header h1 {
   border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
-/* 1. Silla Disponible (Verde) */
 .seat.available {
   background-color: #22c55e !important;
   border-color: #16a34a !important;
@@ -274,7 +276,6 @@ header h1 {
   box-shadow: 0 0 5px rgba(34, 197, 94, 0.8);
 }
 
-/* 2. Silla Seleccionada por Mí (Azul) */
 .seat.my-selection {
   background-color: #0284c7 !important;
   border-color: #0369a1 !important;
@@ -283,7 +284,6 @@ header h1 {
   box-shadow: 0 0 6px rgba(2, 132, 199, 0.8);
 }
 
-/* 3. Silla Bloqueada en espera de pago por otro usuario (Naranja) */
 .seat.locked {
   background-color: #f59e0b !important;
   border-color: #d97706 !important;
@@ -291,13 +291,12 @@ header h1 {
   opacity: 0.85;
 }
 
-/* 4. Silla VENDIDA Definitiva (ROJO para TODOS) */
 .seat.sold {
   background-color: #ef4444 !important;
   border-color: #991b1b !important;
   cursor: not-allowed !important;
   opacity: 0.95;
-  pointer-events: none !important; /* Deshabilita clics */
+  pointer-events: none !important;
 }
 
 /* Vistas de Admin y Tablas */
@@ -421,7 +420,16 @@ th {
 .ticket-header { text-align: center; margin-bottom: 15px; }
 .ticket-body .info-group { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; }
 .ticket-body .highlight { font-weight: 800; color: #2563eb; }
-.qr-container { display: flex; justify-content: center; margin: 15px 0; }
+
+.qr-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  margin: 15px 0;
+}
 
 .ticket-actions {
   display: flex;
